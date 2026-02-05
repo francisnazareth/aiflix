@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+build/
+deploy/
+
+# Deployment
+deploy.zip
+build.zip
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Azurite local storage
+__azurite_db_blob_extent__.json
+__azurite_db_blob__.json
+__blobstorage__/
+
+# Original static files (pre-React conversion)
+index.html
+script.js
+styles.css
+node_modules
