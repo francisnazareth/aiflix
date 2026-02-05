@@ -33,8 +33,23 @@ jobs:
           mkdir deploy
           cp -r build deploy/
           cp server.js deploy/
-          cp package.json deploy/
-          cp package-lock.json deploy/
+          # Create production-only package.json (without react-scripts to prevent Oryx rebuild)
+          cat > deploy/package.json << 'EOF'
+          {
+            "name": "aiflix",
+            "version": "1.0.0",
+            "main": "server.js",
+            "scripts": {
+              "start": "node server.js"
+            },
+            "dependencies": {
+              "express": "^5.2.1"
+            },
+            "engines": {
+              "node": ">=18.0.0"
+            }
+          }
+          EOF
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
