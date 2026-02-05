@@ -1,6 +1,6 @@
 export const contentData = [
   {
-    title: "BAFTA Award Winners & Nominees",
+    title: "DEMO Assets built by SEs & CSAs",
     showProgress: false,
     items: [
       { id: 1, title: "The Godfather", year: "1972", image: "https://via.placeholder.com/250x350/1a1a1a/ff0000?text=The+Godfather" },

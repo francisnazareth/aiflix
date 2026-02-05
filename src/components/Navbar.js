@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const navLinks = ['Home', 'Series', 'Films', 'Games', 'New & Popular', 'My List', 'Browse by Language'];
+const navLinks = ['Home', 'New & Popular', 'My List'];
 
 function Navbar({ activeNavLink, onNavLinkClick }) {
   const [scrolled, setScrolled] = useState(false);

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import ContentCard from './ContentCard';
 
-function ContentRow({ title, items, showProgress }) {
+function ContentRow({ title, items, showProgress, loading }) {
   const carouselRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -48,26 +48,32 @@ function ContentRow({ title, items, showProgress }) {
   return (
     <section className="content-row">
       <h2 className="row-title">{title}</h2>
-      <div 
-        className="carousel"
-        ref={carouselRef}
-        onMouseDown={handleMouseDown}
-        onMouseLeave={handleMouseLeave}
-        onMouseUp={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div className="carousel-track">
-          {items.map((item) => (
-            <ContentCard 
-              key={item.id} 
-              item={item} 
-              showProgress={showProgress} 
-            />
-          ))}
+      {loading ? (
+        <div className="carousel-loading">Loading assets...</div>
+      ) : items.length === 0 ? (
+        <div className="carousel-empty">No assets yet. Click "Add Asset" to create one!</div>
+      ) : (
+        <div 
+          className="carousel"
+          ref={carouselRef}
+          onMouseDown={handleMouseDown}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="carousel-track">
+            {items.map((item) => (
+              <ContentCard 
+                key={item.id} 
+                item={item} 
+                showProgress={showProgress} 
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

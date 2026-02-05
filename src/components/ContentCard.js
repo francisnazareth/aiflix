@@ -1,8 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function ContentCard({ item, showProgress }) {
+  const navigate = useNavigate();
+
   const handleClick = () => {
-    console.log('Playing:', item.title);
+    navigate(`/asset/${item.id}`);
   };
 
   return (

@@ -7,6 +7,13 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server.js'
+      - '.github/workflows/master_aiflix-dev.yml'
   workflow_dispatch:
 
 jobs:

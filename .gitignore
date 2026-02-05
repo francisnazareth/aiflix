@@ -34,6 +34,12 @@ __azurite_db_blob_extent__.json
 __azurite_db_blob__.json
 __blobstorage__/
 
+# Python backend
+backend/.env
+backend/__pycache__/
+backend/*.pyc
+backend/venv/
+
 # Original static files (pre-React conversion)
 /index.html
 /script.js

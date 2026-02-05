@@ -4,6 +4,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
   const [formData, setFormData] = useState({
     assetName: '',
     assetDescription: '',
+    createdBy: '',
     architectureUrl: '',
     presentationUrl: '',
     githubUrl: '',
@@ -12,6 +13,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
   const [currentTag, setCurrentTag] = useState('');
   const [picturePreview, setPicturePreview] = useState(null);
   const [screenshots, setScreenshots] = useState([]);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
   const assetPictureRef = useRef(null);
   const screenshotsRef = useRef(null);
@@ -29,6 +31,42 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
         setPicturePreview(event.target.result);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!formData.assetName && !formData.assetDescription) {
+      alert('Please enter an asset name or description to generate an image.');
+      return;
+    }
+    
+    setIsGeneratingImage(true);
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/generate-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          asset_name: formData.assetName,
+          asset_description: formData.assetDescription,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate image');
+      }
+      
+      const data = await response.json();
+      const imageDataUrl = `data:${data.content_type};base64,${data.image_data}`;
+      setPicturePreview(imageDataUrl);
+    } catch (error) {
+      console.error('Error generating image:', error);
+      alert(`Failed to generate image: ${error.message}`);
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
@@ -74,25 +112,57 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    const submitData = {
-      ...formData,
-      tags,
-      assetPicture: assetPictureRef.current?.files?.[0]?.name || null,
-      screenshots: screenshots.map(s => s.name),
-      submittedAt: new Date().toISOString(),
-    };
-    
-    onSubmit(submitData);
-    resetForm();
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      
+      const submitData = {
+        assetName: formData.assetName,
+        assetDescription: formData.assetDescription,
+        createdBy: formData.createdBy,
+        tags,
+        architectureUrl: formData.architectureUrl || null,
+        presentationUrl: formData.presentationUrl || null,
+        githubUrl: formData.githubUrl || null,
+        assetPicture: picturePreview || null,
+        screenshots: screenshots.map(s => s.data),
+      };
+      
+      const response = await fetch(`${apiUrl}/api/assets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submitData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to save asset');
+      }
+      
+      const savedAsset = await response.json();
+      onSubmit(savedAsset);
+      resetForm();
+      onClose();
+    } catch (error) {
+      console.error('Error saving asset:', error);
+      alert(`Failed to save asset: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
     setFormData({
       assetName: '',
       assetDescription: '',
+      createdBy: '',
       architectureUrl: '',
       presentationUrl: '',
       githubUrl: '',
@@ -156,6 +226,21 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
 
           <div className="form-row">
             <div className="form-group">
+              <label htmlFor="createdBy">Your Name *</label>
+              <input
+                type="text"
+                id="createdBy"
+                name="createdBy"
+                required
+                placeholder="Enter your name"
+                value={formData.createdBy}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
               <label htmlFor="tags">Tags</label>
               <div className="tag-input-container">
                 <input
@@ -166,8 +251,8 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
                   onChange={(e) => setCurrentTag(e.target.value)}
                   onKeyDown={handleTagKeyDown}
                 />
-                <button type="button" className="btn btn-add-tag" onClick={handleAddTag}>
-                  Add Tag
+                <button type="button" className="btn btn-secondary" onClick={handleAddTag}>
+                  + ADD TAG
                 </button>
               </div>
               {tags.length > 0 && (
@@ -186,7 +271,22 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="assetPicture">Asset Picture</label>
-              <div className="file-input-wrapper" onClick={() => assetPictureRef.current?.click()}>
+              <div className="image-input-actions">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={handleGenerateImage}
+                  disabled={isGeneratingImage}
+                >
+                  {isGeneratingImage ? 'GENERATING...' : '+ GENERATE IMAGE'}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => assetPictureRef.current?.click()}
+                >
+                  + CHOOSE IMAGE
+                </button>
                 <input
                   type="file"
                   id="assetPicture"
@@ -194,8 +294,8 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
                   accept="image/*"
                   ref={assetPictureRef}
                   onChange={handlePictureChange}
+                  style={{ display: 'none' }}
                 />
-                <span className="file-input-label">Choose image</span>
               </div>
               {picturePreview && (
                 <div className="preview-container">
@@ -282,8 +382,10 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
           </div>
 
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary">Submit Asset</button>
-            <button type="button" className="btn btn-secondary modal-close-btn" onClick={handleClose}>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Submit Asset'}
+            </button>
+            <button type="button" className="btn btn-secondary modal-close-btn" onClick={handleClose} disabled={isSubmitting}>
               Cancel
             </button>
           </div>

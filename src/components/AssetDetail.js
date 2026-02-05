@@ -1,0 +1,182 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import StarRating from './StarRating';
+import Comments from './Comments';
+
+function AssetDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [asset, setAsset] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+
+  // Fetch authenticated user from EasyAuth
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch('/.auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            const principal = data[0];
+            // Extract user info from EasyAuth claims
+            const claims = principal.user_claims || [];
+            const getClaimValue = (type) => {
+              const claim = claims.find(c => c.typ === type || c.typ.endsWith('/' + type));
+              return claim ? claim.val : null;
+            };
+
+            setUser({
+              userId: principal.user_id || getClaimValue('nameidentifier') || getClaimValue('objectidentifier'),
+              userName: getClaimValue('name') || getClaimValue('preferred_username') || principal.user_id,
+              email: getClaimValue('emailaddress') || getClaimValue('email')
+            });
+          }
+        }
+      } catch (err) {
+        // Running locally without EasyAuth - allow anonymous access
+        console.log('EasyAuth not available, running in anonymous mode');
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    const fetchAsset = async () => {
+      try {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/assets/${id}`);
+        if (!response.ok) {
+          throw new Error('Asset not found');
+        }
+        const data = await response.json();
+        setAsset(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAsset();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="asset-detail-page">
+        <div className="asset-detail-loading">Loading asset...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="asset-detail-page">
+        <div className="asset-detail-error">
+          <h2>Error</h2>
+          <p>{error}</p>
+          <button className="btn btn-primary" onClick={() => navigate('/')}>
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="asset-detail-page">
+      <button className="btn btn-secondary back-btn" onClick={() => navigate('/')}>
+        ← Back to Assets
+      </button>
+
+      <div className="asset-detail-container">
+        <div className="asset-detail-header">
+          <div className="asset-detail-image">
+            {asset.assetPicture ? (
+              <img src={asset.assetPicture} alt={asset.assetName} />
+            ) : (
+              <div className="no-image">No Image</div>
+            )}
+          </div>
+          <div className="asset-detail-info">
+            <h1 className="asset-detail-title">{asset.assetName}</h1>
+            <p className="asset-detail-author">
+              <span className="label">Created by:</span> {asset.createdBy}
+            </p>
+            <p className="asset-detail-date">
+              <span className="label">Created:</span> {new Date(asset.createdAt).toLocaleDateString()}
+            </p>
+            
+            {asset.tags && asset.tags.length > 0 && (
+              <div className="asset-detail-tags">
+                <span className="label">Tags:</span>
+                <div className="tags-list">
+                  {asset.tags.map((tag, index) => (
+                    <span key={index} className="tag-badge">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="asset-detail-description-inline">
+              <p>{asset.assetDescription}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="asset-detail-section">
+          <h2>Resources</h2>
+          <div className="asset-detail-links">
+            {asset.architectureUrl && (
+              <a href={asset.architectureUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">📐</span>
+                Architecture Diagram
+              </a>
+            )}
+            {asset.presentationUrl && (
+              <a href={asset.presentationUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">📊</span>
+                Slide Deck
+              </a>
+            )}
+            {asset.githubUrl && (
+              <a href={asset.githubUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">💻</span>
+                GitHub Repository
+              </a>
+            )}
+            {!asset.architectureUrl && !asset.presentationUrl && !asset.githubUrl && (
+              <p className="no-resources">No resource links available</p>
+            )}
+          </div>
+        </div>
+
+        {asset.screenshots && asset.screenshots.length > 0 && (
+          <div className="asset-detail-section">
+            <h2>Screenshots</h2>
+            <div className="screenshots-grid">
+              {asset.screenshots.map((screenshot, index) => (
+                <div key={index} className="screenshot-item">
+                  <img src={screenshot} alt={`Screenshot ${index + 1}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="asset-detail-section">
+          <h2>Rating</h2>
+          <StarRating assetId={id} user={user} />
+        </div>
+
+        <div className="asset-detail-section">
+          <Comments assetId={id} user={user} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default AssetDetail;
