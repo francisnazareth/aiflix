@@ -50,6 +50,9 @@ jobs:
             }
           }
           EOF
+          # Install production dependencies in deploy folder
+          cd deploy
+          npm install --omit=dev
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4

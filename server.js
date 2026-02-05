@@ -7,8 +7,8 @@ const PORT = process.env.PORT || 8080;
 // Serve static files from the build directory
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => {
+// Handle React routing, return all requests to React app (Express 5 syntax)
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
