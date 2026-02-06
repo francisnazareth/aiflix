@@ -10,6 +10,7 @@ on:
       - master
     paths:
       - 'backend/**'
+      - '.github/workflows/master_aiflix-backend-dev.yml'
   workflow_dispatch:
 
 jobs:
