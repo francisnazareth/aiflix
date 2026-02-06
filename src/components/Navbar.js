@@ -25,9 +25,11 @@ function Navbar({ activeNavLink, onNavLinkClick }) {
         const response = await fetch('/.auth/me');
         if (response.ok) {
           const data = await response.json();
+          console.log('EasyAuth full response:', JSON.stringify(data, null, 2));
           if (data && data.length > 0) {
             const principal = data[0];
             const claims = principal.user_claims || [];
+            console.log('All available claims:', claims);
             const getClaimValue = (type) => {
               const claim = claims.find(c => c.typ === type || c.typ.endsWith('/' + type));
               return claim ? claim.val : null;
