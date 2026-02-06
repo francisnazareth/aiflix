@@ -81,5 +81,5 @@ jobs:
         with:
           app-name: 'aiflix-backend-dev'
           slot-name: 'Production'
-          package: backend
+          package: .
           
