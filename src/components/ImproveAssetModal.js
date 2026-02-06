@@ -99,12 +99,12 @@ function ImproveAssetModal({ onClose, asset, user, onSuccess }) {
   };
 
   const actionCards = [
+    { id: 'demoflow', icon: '🎯', title: 'Add demo flow / talk track', desc: 'How to run the demo' },
     { id: 'deployment', icon: '🚀', title: 'Add deployment script', desc: 'azd / Bicep / Terraform' },
-    { id: 'architecture', icon: '📐', title: 'Add architecture diagram', desc: 'Link to diagram' },
-    { id: 'demoflow', icon: '🎯', title: 'Add demo flow / talk track', desc: 'Step-by-step guide' },
-    { id: 'screenshots', icon: '📸', title: 'Add screenshots', desc: 'Visual walkthrough' },
     { id: 'slides', icon: '🎬', title: 'Add slides or video', desc: 'Presentation / recording' },
-    { id: 'setup', icon: '📝', title: 'Add setup notes', desc: 'Prerequisites & tips' },
+    { id: 'screenshots', icon: '📸', title: 'Add screenshots', desc: 'Visual walkthrough' },
+    { id: 'setup', icon: '📝', title: 'Add setup notes', desc: 'Things to know before running' },
+    { id: 'architecture', icon: '📐', title: 'Add architecture diagram', desc: 'Link to diagram' },
   ];
 
   return (
@@ -112,7 +112,7 @@ function ImproveAssetModal({ onClose, asset, user, onSuccess }) {
       <div className="improve-modal">
         <div className="improve-modal-header">
           <h2>{activeAction ? 'Add Details' : 'Improve this asset'}</h2>
-          <p className="improve-modal-subtitle">Help make "{asset.assetName}" more useful</p>
+          <p className="improve-modal-subtitle">Add only what you have. Even one small addition helps the next SE.</p>
         </div>
         <button className="modal-close" onClick={handleClose}>&times;</button>
 
