@@ -154,3 +154,53 @@
 .profile-menu-item.sign-in:hover {
   background: #f40612;
 }
+
+/* Search Bar Styles */
+.search-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.search-button {
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.search-container.expanded .search-button {
+  color: #fff;
+}
+
+.search-input {
+  position: absolute;
+  right: 0;
+  width: 250px;
+  padding: 8px 12px 8px 40px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  animation: searchExpand 0.3s ease;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.search-input:focus {
+  border-color: #fff;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+@keyframes searchExpand {
+  from {
+    width: 0;
+    opacity: 0;
+  }
+  to {
+    width: 250px;
+    opacity: 1;
+  }
+}

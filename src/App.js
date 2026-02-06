@@ -57,7 +57,7 @@ function AuthRequired({ children }) {
   return children;
 }
 
-function HomePage({ onAddAsset }) {
+function HomePage({ onAddAsset, searchQuery }) {
   const [assets, setAssets] = useState([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
 
@@ -80,20 +80,32 @@ function HomePage({ onAddAsset }) {
     fetchAssets();
   }, []);
 
+  // Filter assets based on search query
+  const filteredAssets = searchQuery
+    ? assets.filter(asset => 
+        asset.assetName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (asset.assetDescription && asset.assetDescription.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : assets;
+
   // Transform assets to content row format
-  const assetItems = assets.map(asset => ({
+  const assetItems = filteredAssets.map(asset => ({
     id: asset.id,
     title: asset.assetName,
     year: asset.createdBy,
     image: asset.assetPicture || 'https://via.placeholder.com/250x350/1a1a1a/ff0000?text=No+Image'
   }));
 
+  const rowTitle = searchQuery 
+    ? `Search results for "${searchQuery}"` 
+    : "DEMO Assets built by SEs & CSAs";
+
   return (
     <>
       <HeroBanner onAddAsset={onAddAsset} />
       <main className="content-area">
         <ContentRow 
-          title="DEMO Assets built by SEs & CSAs"
+          title={rowTitle}
           items={assetItems}
           showProgress={false}
           loading={loadingAssets}
@@ -106,6 +118,7 @@ function HomePage({ onAddAsset }) {
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeNavLink, setActiveNavLink] = useState('Home');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -132,11 +145,13 @@ function App() {
             <div className="app">
               <Navbar 
                 activeNavLink={activeNavLink} 
-                onNavLinkClick={setActiveNavLink} 
+                onNavLinkClick={setActiveNavLink}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
               />
               
               <Routes>
-                <Route path="/" element={<HomePage onAddAsset={handleOpenModal} />} />
+                <Route path="/" element={<HomePage onAddAsset={handleOpenModal} searchQuery={searchQuery} />} />
                 <Route path="/asset/:id" element={<AssetDetail />} />
               </Routes>
 

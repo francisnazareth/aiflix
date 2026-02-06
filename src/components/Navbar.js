@@ -3,11 +3,13 @@ import './Navbar.css';
 
 const navLinks = ['Home', 'New & Popular', 'My List'];
 
-function Navbar({ activeNavLink, onNavLinkClick }) {
+function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) {
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showSearchBar, setShowSearchBar] = useState(false);
   const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -104,7 +106,37 @@ function Navbar({ activeNavLink, onNavLinkClick }) {
           ))}
         </nav>
         <div className="navbar-icons">
-          <button className="icon-button">🔍</button>
+          <div className={`search-container ${showSearchBar ? 'expanded' : ''}`}>
+            <button 
+              className="icon-button search-button"
+              onClick={() => {
+                setShowSearchBar(!showSearchBar);
+                if (!showSearchBar) {
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                } else {
+                  onSearchChange('');
+                }
+              }}
+            >
+              🔍
+            </button>
+            {showSearchBar && (
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="search-input"
+                placeholder="Search assets..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setShowSearchBar(false);
+                    onSearchChange('');
+                  }
+                }}
+              />
+            )}
+          </div>
           <div className="profile-container" ref={dropdownRef}>
             <button 
               className="icon-button profile-button"
