@@ -69,8 +69,7 @@ function App() {
 
   const handleAssetSubmit = (formData) => {
     console.log('Asset submitted:', formData);
-    alert(`Asset "${formData.assetName}" has been saved successfully!`);
-    handleCloseModal();
+    // Success dialog is shown by AddAssetModal
     window.location.reload(); // Refresh to show new asset
   };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import StarRating from './StarRating';
 import Comments from './Comments';
+import ImproveAssetModal from './ImproveAssetModal';
 
 function AssetDetail() {
   const { id } = useParams();
@@ -10,6 +10,7 @@ function AssetDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
+  const [showImproveModal, setShowImproveModal] = useState(false);
 
   // Fetch authenticated user from EasyAuth
   useEffect(() => {
@@ -62,6 +63,15 @@ function AssetDetail() {
 
     fetchAsset();
   }, [id]);
+
+  const refreshAsset = async () => {
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    const response = await fetch(`${apiUrl}/api/assets/${id}`);
+    if (response.ok) {
+      const data = await response.json();
+      setAsset(data);
+    }
+  };
 
   if (loading) {
     return (
@@ -127,7 +137,15 @@ function AssetDetail() {
         </div>
 
         <div className="asset-detail-section">
-          <h2>Resources</h2>
+          <div className="resources-header">
+            <h2>Resources</h2>
+            <button 
+              className="btn btn-improve"
+              onClick={() => setShowImproveModal(true)}
+            >
+              + Improve this asset
+            </button>
+          </div>
           <div className="asset-detail-links">
             {asset.architectureUrl && (
               <a href={asset.architectureUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
@@ -167,14 +185,18 @@ function AssetDetail() {
         )}
 
         <div className="asset-detail-section">
-          <h2>Rating</h2>
-          <StarRating assetId={id} user={user} />
-        </div>
-
-        <div className="asset-detail-section">
           <Comments assetId={id} user={user} />
         </div>
       </div>
+
+      {showImproveModal && (
+        <ImproveAssetModal
+          asset={asset}
+          user={user}
+          onClose={() => setShowImproveModal(false)}
+          onSuccess={refreshAsset}
+        />
+      )}
     </div>
   );
 }

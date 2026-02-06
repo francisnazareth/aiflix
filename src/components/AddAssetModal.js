@@ -1,23 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function AddAssetModal({ isOpen, onClose, onSubmit }) {
   const [user, setUser] = useState(null);
   const [formData, setFormData] = useState({
     assetName: '',
     assetDescription: '',
-    architectureUrl: '',
-    presentationUrl: '',
-    githubUrl: '',
-    liveDemoUrl: '',
+    primaryCustomerScenario: '',
   });
-  const [tags, setTags] = useState([]);
-  const [currentTag, setCurrentTag] = useState('');
+  const [demoLinkType, setDemoLinkType] = useState(null);
+  const [demoLinkUrl, setDemoLinkUrl] = useState('');
   const [picturePreview, setPicturePreview] = useState(null);
-  const [screenshots, setScreenshots] = useState([]);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  
-  const assetPictureRef = useRef(null);
-  const screenshotsRef = useRef(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [savedAsset, setSavedAsset] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Fetch user from EasyAuth
   useEffect(() => {
@@ -51,20 +47,8 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePictureChange = (e) => {
-    if (e.target.files.length > 0) {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPicturePreview(event.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleGenerateImage = async () => {
-    if (!formData.assetName && !formData.assetDescription) {
-      alert('Please enter an asset name or description to generate an image.');
+    if (!savedAsset) {
       return;
     }
     
@@ -77,8 +61,8 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          asset_name: formData.assetName,
-          asset_description: formData.assetDescription,
+          asset_name: savedAsset.assetName,
+          asset_description: savedAsset.assetDescription,
         }),
       });
       
@@ -90,6 +74,15 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
       const data = await response.json();
       const imageDataUrl = `data:${data.content_type};base64,${data.image_data}`;
       setPicturePreview(imageDataUrl);
+      
+      // Update the asset with the generated image
+      await fetch(`${apiUrl}/api/assets/${savedAsset.id}/picture`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ assetPicture: imageDataUrl }),
+      });
     } catch (error) {
       console.error('Error generating image:', error);
       alert(`Failed to generate image: ${error.message}`);
@@ -98,52 +91,18 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
     }
   };
 
-  const handleScreenshotsChange = (e) => {
-    const files = Array.from(e.target.files);
-    const newScreenshots = [];
-    
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        newScreenshots.push({
-          name: file.name,
-          data: event.target.result,
-        });
-        if (newScreenshots.length === files.length) {
-          setScreenshots(newScreenshots);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleRemoveScreenshot = (index) => {
-    setScreenshots(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleAddTag = () => {
-    const trimmedTag = currentTag.trim();
-    if (trimmedTag && !tags.includes(trimmedTag)) {
-      setTags(prev => [...prev, trimmedTag]);
-      setCurrentTag('');
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove) => {
-    setTags(prev => prev.filter(tag => tag !== tagToRemove));
-  };
-
-  const handleTagKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag();
-    }
-  };
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate that a demo link is selected and URL is provided
+    if (!demoLinkType || !demoLinkUrl.trim()) {
+      setErrorMessage('Please select a Demo Link option and enter a URL.');
+      return;
+    }
+    
+    setErrorMessage('');
     setIsSubmitting(true);
     
     try {
@@ -152,14 +111,16 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
       const submitData = {
         assetName: formData.assetName,
         assetDescription: formData.assetDescription,
+        primaryCustomerScenario: formData.primaryCustomerScenario || null,
         createdBy: user?.userName || 'Anonymous',
-        tags,
-        architectureUrl: formData.architectureUrl || null,
-        presentationUrl: formData.presentationUrl || null,
-        githubUrl: formData.githubUrl || null,
-        liveDemoUrl: formData.liveDemoUrl || null,
-        assetPicture: picturePreview || null,
-        screenshots: screenshots.map(s => s.data),
+        tags: [],
+        architectureUrl: demoLinkType === 'architecture' ? demoLinkUrl : null,
+        presentationUrl: demoLinkType === 'presentation' ? demoLinkUrl : null,
+        githubUrl: demoLinkType === 'github' ? demoLinkUrl : null,
+        liveDemoUrl: demoLinkType === 'livedemo' ? demoLinkUrl : null,
+        recordingUrl: demoLinkType === 'recording' ? demoLinkUrl : null,
+        assetPicture: null,
+        screenshots: [],
       };
       
       const response = await fetch(`${apiUrl}/api/assets`, {
@@ -176,9 +137,9 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
       }
       
       const savedAsset = await response.json();
-      onSubmit(savedAsset);
+      setSavedAsset(savedAsset);
       resetForm();
-      onClose();
+      setShowSuccessDialog(true);
     } catch (error) {
       console.error('Error saving asset:', error);
       alert(`Failed to save asset: ${error.message}`);
@@ -191,25 +152,37 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
     setFormData({
       assetName: '',
       assetDescription: '',
-      architectureUrl: '',
-      presentationUrl: '',
-      githubUrl: '',
+      primaryCustomerScenario: '',
     });
-    setTags([]);
-    setCurrentTag('');
+    setDemoLinkType(null);
+    setDemoLinkUrl('');
     setPicturePreview(null);
-    setScreenshots([]);
+    setErrorMessage('');
   };
 
   const handleClose = () => {
     resetForm();
+    setShowSuccessDialog(false);
+    setSavedAsset(null);
     onClose();
+  };
+
+  const handleSuccessOk = () => {
+    if (savedAsset) {
+      onSubmit(savedAsset);
+    }
+    handleClose();
   };
 
   const handleBackdropClick = (e) => {
     if (e.target.classList.contains('modal')) {
       handleClose();
     }
+  };
+
+  const handleDemoLinkSelect = (type) => {
+    setDemoLinkType(demoLinkType === type ? null : type);
+    setErrorMessage('');
   };
 
   if (!isOpen) return null;
@@ -221,6 +194,12 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
           <h2>Add New Asset</h2>
           <button className="modal-close" onClick={handleClose}>&times;</button>
         </div>
+        {errorMessage && (
+          <div className="error-banner">
+            <span className="error-icon">⚠</span>
+            {errorMessage}
+          </div>
+        )}
         <form className="asset-form" onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
@@ -239,12 +218,12 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="assetDescription">Asset Description *</label>
+              <label htmlFor="assetDescription">What this demo shows *</label>
               <textarea
                 id="assetDescription"
                 name="assetDescription"
                 required
-                placeholder="Enter asset description"
+                placeholder="1–2 lines. Think how you'd explain this to another SE."
                 rows="4"
                 value={formData.assetDescription}
                 onChange={handleInputChange}
@@ -254,174 +233,65 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="tags">Tags</label>
-              <div className="tag-input-container">
-                <input
-                  type="text"
-                  id="tags"
-                  placeholder="Enter a tag"
-                  value={currentTag}
-                  onChange={(e) => setCurrentTag(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                />
-                <button type="button" className="btn btn-secondary" onClick={handleAddTag}>
-                  + ADD TAG
-                </button>
-              </div>
-              {tags.length > 0 && (
-                <div className="tags-list">
-                  {tags.map((tag, index) => (
-                    <span key={index} className="tag-badge">
-                      {tag}
-                      <button type="button" onClick={() => handleRemoveTag(tag)}>&times;</button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <label htmlFor="primaryCustomerScenario">Primary Customer Scenario</label>
+              <select
+                id="primaryCustomerScenario"
+                name="primaryCustomerScenario"
+                value={formData.primaryCustomerScenario}
+                onChange={handleInputChange}
+              >
+                <option value=""></option>
+                <option value="Digital Avatar / Conversational UI">Digital Avatar / Conversational UI</option>
+                <option value="Contact Center & CX">Contact Center & CX</option>
+                <option value="HR & Talent">HR & Talent</option>
+                <option value="Finance & Investment Analysis">Finance & Investment Analysis</option>
+                <option value="Procurement & RFP">Procurement & RFP</option>
+                <option value="Platform / Architecture">Platform / Architecture</option>
+              </select>
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="assetPicture">Asset Picture</label>
-              <div className="image-input-actions">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={handleGenerateImage}
-                  disabled={isGeneratingImage}
+              <label>Demo Link (any one)</label>
+              <div className="demo-link-pills">
+                <button
+                  type="button"
+                  className={`demo-link-pill ${demoLinkType === 'github' ? 'active' : ''}`}
+                  onClick={() => handleDemoLinkSelect('github')}
                 >
-                  {isGeneratingImage ? 'GENERATING...' : '+ GENERATE IMAGE'}
+                  <svg className="pill-icon" viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> GitHub
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => assetPictureRef.current?.click()}
+                <button
+                  type="button"
+                  className={`demo-link-pill ${demoLinkType === 'presentation' ? 'active' : ''}`}
+                  onClick={() => handleDemoLinkSelect('presentation')}
                 >
-                  + CHOOSE IMAGE
+                  <svg className="pill-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 17h2v-7H7v7zm4 0h2V7h-2v10zm4 0h2v-4h-2v4z"/></svg> Slide Deck
                 </button>
-                <input
-                  type="file"
-                  id="assetPicture"
-                  name="assetPicture"
-                  accept="image/*"
-                  ref={assetPictureRef}
-                  onChange={handlePictureChange}
-                  style={{ display: 'none' }}
-                />
+                <button
+                  type="button"
+                  className={`demo-link-pill ${demoLinkType === 'livedemo' ? 'active' : ''}`}
+                  onClick={() => handleDemoLinkSelect('livedemo')}
+                >
+                  <svg className="pill-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M8 5v14l11-7z"/></svg> Live Demo URL
+                </button>
+                <button
+                  type="button"
+                  className={`demo-link-pill ${demoLinkType === 'recording' ? 'active' : ''}`}
+                  onClick={() => handleDemoLinkSelect('recording')}
+                >
+                  <svg className="pill-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> Recording
+                </button>
               </div>
-              {picturePreview && (
-                <div className="preview-container">
-                  <img src={picturePreview} alt="Preview" className="preview-image" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="architectureUrl">
-                Architecture URL
-                <span className="info-tooltip">
-                  <span className="info-icon">ⓘ</span>
-                  <span className="tooltip-text">Link to the architecture diagram in SharePoint or GitHub</span>
-                </span>
-              </label>
-              <input
-                type="url"
-                id="architectureUrl"
-                name="architectureUrl"
-                placeholder="https://example.com/architecture"
-                value={formData.architectureUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="presentationUrl">
-                Presentation URL
-                <span className="info-tooltip">
-                  <span className="info-icon">ⓘ</span>
-                  <span className="tooltip-text">Link to the Slide Deck in SharePoint</span>
-                </span>
-              </label>
-              <input
-                type="url"
-                id="presentationUrl"
-                name="presentationUrl"
-                placeholder="https://example.com/presentation"
-                value={formData.presentationUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="githubUrl">GitHub Repository URL</label>
-              <input
-                type="url"
-                id="githubUrl"
-                name="githubUrl"
-                placeholder="https://github.com/username/repo"
-                value={formData.githubUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="liveDemoUrl">
-                Live Demo URL
-                <span className="info-tooltip">
-                  <span className="info-icon">ⓘ</span>
-                  <span className="tooltip-text">Link to live running demo</span>
-                </span>
-              </label>
-              <input
-                type="url"
-                id="liveDemoUrl"
-                name="liveDemoUrl"
-                placeholder="https://example.com/demo"
-                value={formData.liveDemoUrl}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="screenshots">Screenshots</label>
-              <div className="file-input-wrapper" onClick={() => screenshotsRef.current?.click()}>
+              {demoLinkType && (
                 <input
-                  type="file"
-                  id="screenshots"
-                  name="screenshots"
-                  accept="image/*"
-                  multiple
-                  ref={screenshotsRef}
-                  onChange={handleScreenshotsChange}
+                  type="url"
+                  className="demo-link-input"
+                  placeholder={`Enter ${demoLinkType === 'github' ? 'GitHub repository' : demoLinkType === 'presentation' ? 'slide deck' : demoLinkType === 'livedemo' ? 'live demo' : 'recording'} URL`}
+                  value={demoLinkUrl}
+                  onChange={(e) => { setDemoLinkUrl(e.target.value); setErrorMessage(''); }}
                 />
-                <span className="file-input-label">Choose screenshots</span>
-              </div>
-              {screenshots.length > 0 && (
-                <div className="screenshots-container">
-                  {screenshots.map((screenshot, index) => (
-                    <div key={index} className="screenshot-item">
-                      <img src={screenshot.data} alt={screenshot.name} />
-                      <button
-                        type="button"
-                        className="screenshot-remove"
-                        onClick={() => handleRemoveScreenshot(index)}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
               )}
             </div>
           </div>
@@ -436,6 +306,45 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
           </div>
         </form>
       </div>
+
+      {/* Success Dialog */}
+      {showSuccessDialog && (
+        <div className="success-dialog-overlay">
+          <div className="success-dialog">
+            <div className="success-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <p className="success-message">Asset published. You can add more links anytime.</p>
+            
+            {!picturePreview && (
+              <div className="generate-image-section">
+                <p className="generate-image-prompt">Want a cover image? We can generate one automatically.</p>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={handleGenerateImage}
+                  disabled={isGeneratingImage}
+                >
+                  {isGeneratingImage ? 'GENERATING...' : '+ GENERATE IMAGE'}
+                </button>
+              </div>
+            )}
+            
+            {picturePreview && (
+              <div className="generated-image-preview">
+                <img src={picturePreview} alt="Generated cover" />
+                <p className="image-added-text">✓ Cover image added!</p>
+              </div>
+            )}
+            
+            <button className="btn btn-primary" onClick={handleSuccessOk}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

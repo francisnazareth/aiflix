@@ -37,12 +37,14 @@ class ImageGenerationResponse(BaseModel):
 class AssetCreate(BaseModel):
     assetName: str
     assetDescription: str
+    primaryCustomerScenario: Optional[str] = None
     createdBy: str
     tags: List[str] = []
     architectureUrl: Optional[str] = None
     presentationUrl: Optional[str] = None
     githubUrl: Optional[str] = None
     liveDemoUrl: Optional[str] = None
+    recordingUrl: Optional[str] = None
     assetPicture: Optional[str] = None  # Base64 image data
     screenshots: List[str] = []
 
@@ -50,12 +52,14 @@ class Asset(BaseModel):
     id: str
     assetName: str
     assetDescription: str
+    primaryCustomerScenario: Optional[str] = None
     createdBy: str
     tags: List[str] = []
     architectureUrl: Optional[str] = None
     presentationUrl: Optional[str] = None
     githubUrl: Optional[str] = None
     liveDemoUrl: Optional[str] = None
+    recordingUrl: Optional[str] = None
     assetPicture: Optional[str] = None
     screenshots: List[str] = []
     createdAt: str
@@ -88,6 +92,24 @@ class Comment(BaseModel):
     userName: str
     createdAt: str
 
+class AssetPictureUpdate(BaseModel):
+    assetPicture: str
+
+class ImprovementCreate(BaseModel):
+    type: str  # deployment, architecture, demoflow, screenshots, slides, setup
+    contributorId: str
+    contributorName: str
+    data: dict  # Flexible data based on improvement type
+
+class Improvement(BaseModel):
+    id: str
+    assetId: str
+    type: str
+    contributorId: str
+    contributorName: str
+    data: dict
+    createdAt: str
+
 # === Azure Configuration ===
 
 # Azure AI Foundry configuration
@@ -111,6 +133,7 @@ database = None
 container = None
 ratings_container = None
 comments_container = None
+improvements_container = None
 
 # Initialize Blob Storage client
 blob_service_client = None
@@ -172,7 +195,7 @@ def upload_image_to_blob(image_base64: str, filename: str) -> str:
     return f"{blob_client.url}?{sas_token}"
 
 def init_cosmos():
-    global cosmos_client, database, container, ratings_container, comments_container
+    global cosmos_client, database, container, ratings_container, comments_container, improvements_container
     print(f"DEBUG - COSMOS_ENDPOINT: {COSMOS_ENDPOINT}")
     print(f"DEBUG - COSMOS_KEY present: {bool(COSMOS_KEY)}")
     print(f"DEBUG - COSMOS_DATABASE: {COSMOS_DATABASE}")
@@ -194,6 +217,11 @@ def init_cosmos():
             # Comments container - partitioned by assetId
             comments_container = database.create_container_if_not_exists(
                 id="comments",
+                partition_key=PartitionKey(path="/assetId")
+            )
+            # Improvements container - partitioned by assetId
+            improvements_container = database.create_container_if_not_exists(
+                id="improvements",
                 partition_key=PartitionKey(path="/assetId")
             )
             print(f"Connected to Cosmos DB: {COSMOS_DATABASE}/{COSMOS_CONTAINER}")
@@ -254,12 +282,14 @@ async def create_asset(asset: AssetCreate):
         "id": asset_id,
         "assetName": asset.assetName,
         "assetDescription": asset.assetDescription,
+        "primaryCustomerScenario": asset.primaryCustomerScenario,
         "createdBy": asset.createdBy,
         "tags": asset.tags,
         "architectureUrl": asset.architectureUrl,
         "presentationUrl": asset.presentationUrl,
         "githubUrl": asset.githubUrl,
         "liveDemoUrl": asset.liveDemoUrl,
+        "recordingUrl": asset.recordingUrl,
         "assetPicture": asset_picture_url,
         "screenshots": screenshot_urls,
         "createdAt": datetime.utcnow().isoformat()
@@ -314,6 +344,41 @@ async def get_asset(asset_id: str):
         return Asset(**asset)
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch asset: {str(e)}")
+
+@app.patch("/api/assets/{asset_id}/picture", response_model=Asset)
+async def update_asset_picture(asset_id: str, picture_update: AssetPictureUpdate):
+    """Update an asset's picture."""
+    if not container:
+        raise HTTPException(status_code=500, detail="Cosmos DB not configured")
+    
+    try:
+        # Get the existing asset
+        query = f"SELECT * FROM c WHERE c.id = @id"
+        params = [{"name": "@id", "value": asset_id}]
+        items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+        if not items:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        asset = items[0]
+        
+        # Upload the image to blob storage if configured
+        asset_picture_url = picture_update.assetPicture
+        if blob_service_client and picture_update.assetPicture and picture_update.assetPicture.startswith('data:'):
+            try:
+                filename = f"{asset_id}_cover.png"
+                asset_picture_url = upload_image_to_blob(picture_update.assetPicture, filename)
+            except Exception as e:
+                print(f"Failed to upload image to blob: {e}")
+                # Fall back to base64
+        
+        # Update the asset
+        asset["assetPicture"] = asset_picture_url
+        
+        # Replace the item in Cosmos DB
+        result = container.replace_item(item=asset_id, body=asset)
+        return Asset(**result)
+    except exceptions.CosmosHttpResponseError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update asset picture: {str(e)}")
 
 # === Rating Endpoints ===
 
@@ -465,6 +530,54 @@ async def delete_comment(asset_id: str, comment_id: str, user_id: str):
         return {"message": "Comment deleted"}
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete comment: {str(e)}")
+
+# === Improvements Endpoints ===
+
+@app.post("/api/assets/{asset_id}/improvements", response_model=Improvement)
+async def create_improvement(asset_id: str, improvement: ImprovementCreate):
+    """Add an improvement to an asset."""
+    if not improvements_container:
+        raise HTTPException(status_code=500, detail="Cosmos DB not configured")
+    
+    # Verify asset exists
+    if container:
+        try:
+            query = "SELECT * FROM c WHERE c.id = @id"
+            params = [{"name": "@id", "value": asset_id}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            if not items:
+                raise HTTPException(status_code=404, detail="Asset not found")
+        except exceptions.CosmosHttpResponseError:
+            pass  # Allow improvement even if asset check fails
+    
+    try:
+        improvement_doc = {
+            "id": str(uuid.uuid4()),
+            "assetId": asset_id,
+            "type": improvement.type,
+            "contributorId": improvement.contributorId,
+            "contributorName": improvement.contributorName,
+            "data": improvement.data,
+            "createdAt": datetime.utcnow().isoformat()
+        }
+        result = improvements_container.create_item(body=improvement_doc)
+        return Improvement(**result)
+    except exceptions.CosmosHttpResponseError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create improvement: {str(e)}")
+
+@app.get("/api/assets/{asset_id}/improvements", response_model=List[Improvement])
+async def get_improvements(asset_id: str):
+    """Get all improvements for an asset."""
+    if not improvements_container:
+        raise HTTPException(status_code=500, detail="Cosmos DB not configured")
+    
+    try:
+        query = "SELECT * FROM c WHERE c.assetId = @assetId ORDER BY c.createdAt DESC"
+        params = [{"name": "@assetId", "value": asset_id}]
+        items = list(improvements_container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+        return [Improvement(**item) for item in items]
+    except exceptions.CosmosHttpResponseError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch improvements: {str(e)}")
 
 # === Image Generation Endpoint ===
 
