@@ -46,8 +46,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
       setSavedAsset(null);
       setErrorMessage('');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editAsset?.id]);
+  }, [isOpen, editAsset]);
 
   // Fetch user from EasyAuth
   useEffect(() => {
