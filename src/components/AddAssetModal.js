@@ -1,19 +1,53 @@
 import React, { useState, useEffect } from 'react';
 
-function AddAssetModal({ isOpen, onClose, onSubmit }) {
+function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
+  const isEditMode = !!editAsset;
   const [user, setUser] = useState(null);
+  
+  // Determine initial demo link type and URL from asset being edited
+  const getInitialDemoLink = () => {
+    if (editAsset) {
+      if (editAsset.githubUrl) return { type: 'github', url: editAsset.githubUrl };
+      if (editAsset.presentationUrl) return { type: 'presentation', url: editAsset.presentationUrl };
+      if (editAsset.liveDemoUrl) return { type: 'livedemo', url: editAsset.liveDemoUrl };
+      if (editAsset.recordingUrl) return { type: 'recording', url: editAsset.recordingUrl };
+      if (editAsset.architectureUrl) return { type: 'architecture', url: editAsset.architectureUrl };
+    }
+    return { type: null, url: '' };
+  };
+
   const [formData, setFormData] = useState({
-    assetName: '',
-    assetDescription: '',
-    primaryCustomerScenario: '',
+    assetName: editAsset?.assetName || '',
+    assetDescription: editAsset?.assetDescription || '',
+    primaryCustomerScenario: editAsset?.primaryCustomerScenario || '',
   });
-  const [demoLinkType, setDemoLinkType] = useState(null);
-  const [demoLinkUrl, setDemoLinkUrl] = useState('');
+  const initialDemoLink = getInitialDemoLink();
+  const [demoLinkType, setDemoLinkType] = useState(initialDemoLink.type);
+  const [demoLinkUrl, setDemoLinkUrl] = useState(initialDemoLink.url);
   const [picturePreview, setPicturePreview] = useState(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [savedAsset, setSavedAsset] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Reset form when modal opens or editAsset changes
+  useEffect(() => {
+    if (isOpen) {
+      const demoLink = getInitialDemoLink();
+      setFormData({
+        assetName: editAsset?.assetName || '',
+        assetDescription: editAsset?.assetDescription || '',
+        primaryCustomerScenario: editAsset?.primaryCustomerScenario || '',
+      });
+      setDemoLinkType(demoLink.type);
+      setDemoLinkUrl(demoLink.url);
+      setPicturePreview(null);
+      setShowSuccessDialog(false);
+      setSavedAsset(null);
+      setErrorMessage('');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editAsset?.id]);
 
   // Fetch user from EasyAuth
   useEffect(() => {
@@ -112,19 +146,27 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
         assetName: formData.assetName,
         assetDescription: formData.assetDescription,
         primaryCustomerScenario: formData.primaryCustomerScenario || null,
-        createdBy: user?.userName || 'Anonymous',
-        tags: [],
         architectureUrl: demoLinkType === 'architecture' ? demoLinkUrl : null,
         presentationUrl: demoLinkType === 'presentation' ? demoLinkUrl : null,
         githubUrl: demoLinkType === 'github' ? demoLinkUrl : null,
         liveDemoUrl: demoLinkType === 'livedemo' ? demoLinkUrl : null,
         recordingUrl: demoLinkType === 'recording' ? demoLinkUrl : null,
-        assetPicture: null,
-        screenshots: [],
       };
       
-      const response = await fetch(`${apiUrl}/api/assets`, {
-        method: 'POST',
+      // Include extra fields only for create mode
+      if (!isEditMode) {
+        submitData.createdBy = user?.userName || 'Anonymous';
+        submitData.tags = [];
+        submitData.assetPicture = null;
+        submitData.screenshots = [];
+      }
+      
+      const url = isEditMode 
+        ? `${apiUrl}/api/assets/${editAsset.id}`
+        : `${apiUrl}/api/assets`;
+      
+      const response = await fetch(url, {
+        method: isEditMode ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -137,9 +179,17 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
       }
       
       const savedAsset = await response.json();
-      setSavedAsset(savedAsset);
-      resetForm();
-      setShowSuccessDialog(true);
+      
+      if (isEditMode) {
+        // For edit mode, just call onSubmit and close
+        onSubmit(savedAsset);
+        onClose();
+      } else {
+        // For create mode, show success dialog
+        setSavedAsset(savedAsset);
+        resetForm();
+        setShowSuccessDialog(true);
+      }
     } catch (error) {
       console.error('Error saving asset:', error);
       alert(`Failed to save asset: ${error.message}`);
@@ -191,7 +241,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
     <div className="modal show" onClick={handleBackdropClick}>
       <div className="modal-content">
         <div className="modal-header">
-          <h2>Add New Asset</h2>
+          <h2>{isEditMode ? 'Edit Asset' : 'Add New Asset'}</h2>
           <button className="modal-close" onClick={handleClose}>&times;</button>
         </div>
         {errorMessage && (
@@ -298,7 +348,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
 
           <div className="form-actions">
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Submit Asset'}
+              {isSubmitting ? 'Saving...' : (isEditMode ? 'Update Asset' : 'Submit Asset')}
             </button>
             <button type="button" className="btn btn-secondary modal-close-btn" onClick={handleClose} disabled={isSubmitting}>
               Cancel

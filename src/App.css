@@ -255,6 +255,22 @@ body {
     background-color: rgba(255, 255, 255, 0.5);
 }
 
+.btn-danger {
+    background-color: #dc3545;
+    color: var(--text-light);
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+    transform: scale(1.05);
+}
+
+.btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 @keyframes slideInLeft {
     from {
         opacity: 0;
@@ -1260,6 +1276,19 @@ body {
     font-size: 1rem;
     line-height: 1.7;
     color: var(--text-gray);
+}
+
+.asset-owner-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.asset-owner-actions .btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
 }
 
 .asset-detail-section {

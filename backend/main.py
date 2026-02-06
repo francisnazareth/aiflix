@@ -95,6 +95,19 @@ class Comment(BaseModel):
 class AssetPictureUpdate(BaseModel):
     assetPicture: str
 
+class AssetUpdate(BaseModel):
+    assetName: Optional[str] = None
+    assetDescription: Optional[str] = None
+    primaryCustomerScenario: Optional[str] = None
+    tags: Optional[List[str]] = None
+    architectureUrl: Optional[str] = None
+    presentationUrl: Optional[str] = None
+    githubUrl: Optional[str] = None
+    liveDemoUrl: Optional[str] = None
+    recordingUrl: Optional[str] = None
+    assetPicture: Optional[str] = None
+    screenshots: Optional[List[str]] = None
+
 class ImprovementCreate(BaseModel):
     type: str  # deployment, architecture, demoflow, screenshots, slides, setup
     contributorId: str
@@ -379,6 +392,97 @@ async def update_asset_picture(asset_id: str, picture_update: AssetPictureUpdate
         return Asset(**result)
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to update asset picture: {str(e)}")
+
+@app.put("/api/assets/{asset_id}", response_model=Asset)
+async def update_asset(asset_id: str, asset_update: AssetUpdate):
+    """Update an asset's details."""
+    if not container:
+        raise HTTPException(status_code=500, detail="Cosmos DB not configured")
+    
+    try:
+        # Get the existing asset
+        query = f"SELECT * FROM c WHERE c.id = @id"
+        params = [{"name": "@id", "value": asset_id}]
+        items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+        if not items:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        asset = items[0]
+        
+        # Update only provided fields
+        update_data = asset_update.model_dump(exclude_unset=True)
+        
+        # Handle image upload if provided as base64
+        if 'assetPicture' in update_data and update_data['assetPicture']:
+            if blob_service_client and update_data['assetPicture'].startswith('data:'):
+                try:
+                    filename = f"{asset_id}_cover.png"
+                    update_data['assetPicture'] = upload_image_to_blob(update_data['assetPicture'], filename)
+                except Exception as e:
+                    print(f"Failed to upload image to blob: {e}")
+        
+        for key, value in update_data.items():
+            asset[key] = value
+        
+        # Replace the item in Cosmos DB
+        result = container.replace_item(item=asset_id, body=asset)
+        return Asset(**result)
+    except exceptions.CosmosHttpResponseError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update asset: {str(e)}")
+
+@app.delete("/api/assets/{asset_id}")
+async def delete_asset(asset_id: str):
+    """Delete an asset and its associated data."""
+    if not container:
+        raise HTTPException(status_code=500, detail="Cosmos DB not configured")
+    
+    try:
+        # Get the existing asset
+        query = f"SELECT * FROM c WHERE c.id = @id"
+        params = [{"name": "@id", "value": asset_id}]
+        items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+        if not items:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        
+        asset = items[0]
+        
+        # Delete associated ratings
+        if ratings_container:
+            try:
+                rating_query = "SELECT * FROM c WHERE c.assetId = @assetId"
+                rating_params = [{"name": "@assetId", "value": asset_id}]
+                ratings = list(ratings_container.query_items(query=rating_query, parameters=rating_params, enable_cross_partition_query=True))
+                for rating in ratings:
+                    ratings_container.delete_item(item=rating['id'], partition_key=rating['assetId'])
+            except Exception as e:
+                print(f"Failed to delete ratings: {e}")
+        
+        # Delete associated comments
+        if comments_container:
+            try:
+                comment_query = "SELECT * FROM c WHERE c.assetId = @assetId"
+                comment_params = [{"name": "@assetId", "value": asset_id}]
+                comments = list(comments_container.query_items(query=comment_query, parameters=comment_params, enable_cross_partition_query=True))
+                for comment in comments:
+                    comments_container.delete_item(item=comment['id'], partition_key=comment['assetId'])
+            except Exception as e:
+                print(f"Failed to delete comments: {e}")
+        
+        # Delete asset image from blob storage if exists
+        if blob_service_client and asset.get('assetPicture') and 'blob.core.windows.net' in asset.get('assetPicture', ''):
+            try:
+                blob_container_client = blob_service_client.get_container_client(os.getenv('BLOB_CONTAINER_NAME', 'assets'))
+                blob_name = f"{asset_id}_cover.png"
+                blob_container_client.delete_blob(blob_name)
+            except Exception as e:
+                print(f"Failed to delete blob: {e}")
+        
+        # Delete the asset
+        container.delete_item(item=asset_id, partition_key=asset['createdBy'])
+        
+        return {"message": "Asset deleted successfully"}
+    except exceptions.CosmosHttpResponseError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete asset: {str(e)}")
 
 # === Rating Endpoints ===
 
