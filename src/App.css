@@ -309,21 +309,22 @@ body {
    ============================ */
 .carousel {
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     padding: 0 4rem;
 }
 
 .carousel-track {
     display: flex;
-    gap: 0.5rem;
-    scroll-behavior: smooth;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 /* ============================
    CONTENT CARD STYLES
    ============================ */
 .content-card {
-    flex: 0 0 250px;
+    flex: 0 0 calc((100% - 4rem) / 5);
+    max-width: calc((100% - 4rem) / 5);
     height: 350px;
     position: relative;
     border-radius: 4px;
@@ -345,6 +346,12 @@ body {
     height: 100%;
     object-fit: cover;
     display: block;
+}
+
+.card-placeholder {
+    width: 100%;
+    height: 100%;
+    background-color: var(--secondary-color);
 }
 
 .card-overlay {
@@ -449,7 +456,8 @@ body {
     }
 
     .content-card {
-        flex: 0 0 200px;
+        flex: 0 0 calc((100% - 3rem) / 4);
+        max-width: calc((100% - 3rem) / 4);
         height: 280px;
     }
 
@@ -505,7 +513,8 @@ body {
     }
 
     .content-card {
-        flex: 0 0 160px;
+        flex: 0 0 calc((100% - 2rem) / 3);
+        max-width: calc((100% - 2rem) / 3);
         height: 220px;
     }
 
@@ -516,6 +525,14 @@ body {
     .footer-content {
         grid-template-columns: 1fr;
         gap: 2rem;
+    }
+}
+
+@media (max-width: 500px) {
+    .content-card {
+        flex: 0 0 calc((100% - 1rem) / 2);
+        max-width: calc((100% - 1rem) / 2);
+        height: 200px;
     }
 }
 
