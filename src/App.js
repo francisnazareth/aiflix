@@ -5,6 +5,7 @@ import HeroBanner from './components/HeroBanner';
 import ContentRow from './components/ContentRow';
 import AddAssetModal from './components/AddAssetModal';
 import AssetDetail from './components/AssetDetail';
+import SignedOutPage from './components/SignedOutPage';
 
 function HomePage({ onAddAsset }) {
   const [assets, setAssets] = useState([]);
@@ -75,23 +76,28 @@ function App() {
 
   return (
     <Router>
-      <div className="app">
-        <Navbar 
-          activeNavLink={activeNavLink} 
-          onNavLinkClick={setActiveNavLink} 
-        />
-        
-        <Routes>
-          <Route path="/" element={<HomePage onAddAsset={handleOpenModal} />} />
-          <Route path="/asset/:id" element={<AssetDetail />} />
-        </Routes>
+      <Routes>
+        <Route path="/signed-out" element={<SignedOutPage />} />
+        <Route path="/*" element={
+          <div className="app">
+            <Navbar 
+              activeNavLink={activeNavLink} 
+              onNavLinkClick={setActiveNavLink} 
+            />
+            
+            <Routes>
+              <Route path="/" element={<HomePage onAddAsset={handleOpenModal} />} />
+              <Route path="/asset/:id" element={<AssetDetail />} />
+            </Routes>
 
-        <AddAssetModal 
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          onSubmit={handleAssetSubmit}
-        />
-      </div>
+            <AddAssetModal 
+              isOpen={isModalOpen}
+              onClose={handleCloseModal}
+              onSubmit={handleAssetSubmit}
+            />
+          </div>
+        } />
+      </Routes>
     </Router>
   );
 }

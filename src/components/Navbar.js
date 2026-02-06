@@ -61,7 +61,7 @@ function Navbar({ activeNavLink, onNavLinkClick }) {
   }, []);
 
   const handleSignOut = () => {
-    window.location.href = '/.auth/logout';
+    window.location.href = '/.auth/logout?post_logout_redirect_uri=/signed-out';
   };
 
   const getInitials = (name) => {

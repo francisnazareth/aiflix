@@ -659,6 +659,62 @@ body {
 }
 
 /* ============================
+   INFO TOOLTIP STYLES
+   ============================ */
+.info-tooltip {
+    position: relative;
+    display: inline-block;
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.info-icon {
+    font-size: 0.85rem;
+    color: #888;
+    vertical-align: super;
+    transition: color 0.2s;
+}
+
+.info-tooltip:hover .info-icon {
+    color: #e50914;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: normal;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: visibility 0.2s, opacity 0.2s;
+}
+
+.tooltip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+.info-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* ============================
    FILE INPUT STYLES
    ============================ */
 .file-input-wrapper {

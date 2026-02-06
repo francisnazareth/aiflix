@@ -42,6 +42,7 @@ class AssetCreate(BaseModel):
     architectureUrl: Optional[str] = None
     presentationUrl: Optional[str] = None
     githubUrl: Optional[str] = None
+    liveDemoUrl: Optional[str] = None
     assetPicture: Optional[str] = None  # Base64 image data
     screenshots: List[str] = []
 
@@ -54,6 +55,7 @@ class Asset(BaseModel):
     architectureUrl: Optional[str] = None
     presentationUrl: Optional[str] = None
     githubUrl: Optional[str] = None
+    liveDemoUrl: Optional[str] = None
     assetPicture: Optional[str] = None
     screenshots: List[str] = []
     createdAt: str
@@ -257,6 +259,7 @@ async def create_asset(asset: AssetCreate):
         "architectureUrl": asset.architectureUrl,
         "presentationUrl": asset.presentationUrl,
         "githubUrl": asset.githubUrl,
+        "liveDemoUrl": asset.liveDemoUrl,
         "assetPicture": asset_picture_url,
         "screenshots": screenshot_urls,
         "createdAt": datetime.utcnow().isoformat()

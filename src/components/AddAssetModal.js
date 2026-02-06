@@ -1,13 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 function AddAssetModal({ isOpen, onClose, onSubmit }) {
+  const [user, setUser] = useState(null);
   const [formData, setFormData] = useState({
     assetName: '',
     assetDescription: '',
-    createdBy: '',
     architectureUrl: '',
     presentationUrl: '',
     githubUrl: '',
+    liveDemoUrl: '',
   });
   const [tags, setTags] = useState([]);
   const [currentTag, setCurrentTag] = useState('');
@@ -17,6 +18,33 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
   
   const assetPictureRef = useRef(null);
   const screenshotsRef = useRef(null);
+
+  // Fetch user from EasyAuth
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch('/.auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            const principal = data[0];
+            const claims = principal.user_claims || [];
+            const getClaimValue = (type) => {
+              const claim = claims.find(c => c.typ === type || c.typ.endsWith('/' + type));
+              return claim ? claim.val : null;
+            };
+            setUser({
+              userId: principal.user_id,
+              userName: getClaimValue('name') || getClaimValue('preferred_username') || principal.user_id
+            });
+          }
+        }
+      } catch (err) {
+        console.log('EasyAuth not available');
+      }
+    };
+    fetchUser();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -124,11 +152,12 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
       const submitData = {
         assetName: formData.assetName,
         assetDescription: formData.assetDescription,
-        createdBy: formData.createdBy,
+        createdBy: user?.userName || 'Anonymous',
         tags,
         architectureUrl: formData.architectureUrl || null,
         presentationUrl: formData.presentationUrl || null,
         githubUrl: formData.githubUrl || null,
+        liveDemoUrl: formData.liveDemoUrl || null,
         assetPicture: picturePreview || null,
         screenshots: screenshots.map(s => s.data),
       };
@@ -162,7 +191,6 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
     setFormData({
       assetName: '',
       assetDescription: '',
-      createdBy: '',
       architectureUrl: '',
       presentationUrl: '',
       githubUrl: '',
@@ -219,21 +247,6 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
                 placeholder="Enter asset description"
                 rows="4"
                 value={formData.assetDescription}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="createdBy">Your Name *</label>
-              <input
-                type="text"
-                id="createdBy"
-                name="createdBy"
-                required
-                placeholder="Enter your name"
-                value={formData.createdBy}
                 onChange={handleInputChange}
               />
             </div>
@@ -307,7 +320,13 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="architectureUrl">Architecture URL</label>
+              <label htmlFor="architectureUrl">
+                Architecture URL
+                <span className="info-tooltip">
+                  <span className="info-icon">ⓘ</span>
+                  <span className="tooltip-text">Link to the architecture diagram in SharePoint or GitHub</span>
+                </span>
+              </label>
               <input
                 type="url"
                 id="architectureUrl"
@@ -321,7 +340,13 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="presentationUrl">Presentation URL</label>
+              <label htmlFor="presentationUrl">
+                Presentation URL
+                <span className="info-tooltip">
+                  <span className="info-icon">ⓘ</span>
+                  <span className="tooltip-text">Link to the Slide Deck in SharePoint</span>
+                </span>
+              </label>
               <input
                 type="url"
                 id="presentationUrl"
@@ -342,6 +367,26 @@ function AddAssetModal({ isOpen, onClose, onSubmit }) {
                 name="githubUrl"
                 placeholder="https://github.com/username/repo"
                 value={formData.githubUrl}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="liveDemoUrl">
+                Live Demo URL
+                <span className="info-tooltip">
+                  <span className="info-icon">ⓘ</span>
+                  <span className="tooltip-text">Link to live running demo</span>
+                </span>
+              </label>
+              <input
+                type="url"
+                id="liveDemoUrl"
+                name="liveDemoUrl"
+                placeholder="https://example.com/demo"
+                value={formData.liveDemoUrl}
                 onChange={handleInputChange}
               />
             </div>

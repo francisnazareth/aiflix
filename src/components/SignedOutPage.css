@@ -1,0 +1,188 @@
+.signed-out-page {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.poster-grid-background {
+  position: absolute;
+  top: -10%;
+  left: -5%;
+  right: -5%;
+  bottom: -10%;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 10px;
+  transform: rotate(-10deg) scale(1.3);
+  z-index: 1;
+}
+
+.poster-placeholder {
+  border-radius: 4px;
+  overflow: hidden;
+  animation: posterFadeIn 1s ease forwards;
+  opacity: 0;
+}
+
+.poster-inner {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+}
+
+@keyframes posterFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+.gradient-overlay {
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.9) 100%),
+    linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.9) 100%);
+  z-index: 2;
+}
+
+.signed-out-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 60px;
+}
+
+.signed-out-header .logo {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #e50914;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.sign-in-btn {
+  background: #e50914;
+  color: #fff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sign-in-btn:hover {
+  background: #f40612;
+}
+
+.signed-out-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: calc(100vh - 200px);
+  padding: 0 20px;
+}
+
+.signed-out-content h1 {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: #fff;
+  margin: 0 0 20px 0;
+  max-width: 800px;
+  line-height: 1.1;
+}
+
+.subtitle {
+  font-size: 1.5rem;
+  color: #fff;
+  margin: 0 0 30px 0;
+}
+
+.cta-text {
+  font-size: 1.2rem;
+  color: #ccc;
+  margin: 0 0 20px 0;
+}
+
+.get-started-btn {
+  background: #e50914;
+  color: #fff;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 4px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.get-started-btn:hover {
+  background: #f40612;
+}
+
+.get-started-btn .arrow {
+  font-size: 1.8rem;
+}
+
+.bottom-gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  background: linear-gradient(to top, 
+    #000 0%,
+    rgba(0,0,0,0.8) 30%,
+    transparent 100%
+  );
+  z-index: 3;
+}
+
+.bottom-gradient::before {
+  content: '';
+  position: absolute;
+  bottom: 60px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(90deg, 
+    #e50914 0%, 
+    #b20710 50%,
+    #e50914 100%
+  );
+}
+
+@media (max-width: 768px) {
+  .signed-out-header {
+    padding: 15px 20px;
+  }
+  
+  .signed-out-header .logo {
+    font-size: 1.8rem;
+  }
+  
+  .signed-out-content h1 {
+    font-size: 2rem;
+  }
+  
+  .subtitle {
+    font-size: 1.1rem;
+  }
+  
+  .poster-grid-background {
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+  }
+}
