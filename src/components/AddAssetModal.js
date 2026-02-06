@@ -81,7 +81,8 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
   };
 
   const handleGenerateImage = async () => {
-    if (!savedAsset) {
+    const targetAsset = savedAsset || editAsset;
+    if (!targetAsset) {
       return;
     }
     
@@ -94,8 +95,8 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          asset_name: savedAsset.assetName,
-          asset_description: savedAsset.assetDescription,
+          asset_name: targetAsset.assetName,
+          asset_description: targetAsset.assetDescription,
         }),
       });
       
@@ -109,7 +110,8 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
       setPicturePreview(imageDataUrl);
       
       // Update the asset with the generated image
-      await fetch(`${apiUrl}/api/assets/${savedAsset.id}/picture`, {
+      const targetAsset = savedAsset || editAsset;
+      await fetch(`${apiUrl}/api/assets/${targetAsset.id}/picture`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -344,6 +346,31 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
               )}
             </div>
           </div>
+
+          {isEditMode && (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Cover Image</label>
+                <div className="edit-image-section">
+                  {(picturePreview || editAsset?.assetPicture) ? (
+                    <div className="edit-image-preview">
+                      <img src={picturePreview || editAsset.assetPicture} alt="Asset cover" />
+                    </div>
+                  ) : (
+                    <div className="edit-image-placeholder">No cover image</div>
+                  )}
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary generate-image-btn" 
+                    onClick={handleGenerateImage}
+                    disabled={isGeneratingImage}
+                  >
+                    {isGeneratingImage ? 'Generating...' : (editAsset?.assetPicture || picturePreview ? 'Regenerate Image' : 'Generate Image')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="form-actions">
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
