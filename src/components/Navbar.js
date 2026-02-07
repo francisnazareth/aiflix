@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Navbar.css';
 
-const navLinks = ['Home', 'New & Popular', 'My List'];
+const navLinks = ['Home']; // Hidden for now: 'New & Popular', 'My List'
 
 function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) {
   const [scrolled, setScrolled] = useState(false);
@@ -10,6 +10,7 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) 
   const [showSearchBar, setShowSearchBar] = useState(false);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -62,6 +63,21 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Close search bar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowSearchBar(false);
+        onSearchChange('');
+      }
+    };
+
+    if (showSearchBar) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSearchBar, onSearchChange]);
+
   const handleSignOut = () => {
     window.location.href = '/.auth/logout?post_logout_redirect_uri=/signed-out';
   };
@@ -106,7 +122,7 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) 
           ))}
         </nav>
         <div className="navbar-icons">
-          <div className={`search-container ${showSearchBar ? 'expanded' : ''}`}>
+          <div ref={searchContainerRef} className={`search-container ${showSearchBar ? 'expanded' : ''}`}>
             <button 
               className="icon-button search-button"
               onClick={() => {
