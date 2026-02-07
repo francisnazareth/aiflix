@@ -110,7 +110,6 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
       setPicturePreview(imageDataUrl);
       
       // Update the asset with the generated image
-      const targetAsset = savedAsset || editAsset;
       await fetch(`${apiUrl}/api/assets/${targetAsset.id}/picture`, {
         method: 'PATCH',
         headers: {

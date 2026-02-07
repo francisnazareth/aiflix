@@ -63,6 +63,7 @@ class Asset(BaseModel):
     assetPicture: Optional[str] = None
     screenshots: List[str] = []
     createdAt: str
+    lastMaintainedAt: Optional[str] = None
     averageRating: Optional[float] = None
     ratingCount: Optional[int] = 0
 
@@ -305,7 +306,8 @@ async def create_asset(asset: AssetCreate):
         "recordingUrl": asset.recordingUrl,
         "assetPicture": asset_picture_url,
         "screenshots": screenshot_urls,
-        "createdAt": datetime.utcnow().isoformat()
+        "createdAt": datetime.utcnow().isoformat(),
+        "lastMaintainedAt": datetime.utcnow().isoformat()
     }
     
     try:
@@ -423,6 +425,9 @@ async def update_asset(asset_id: str, asset_update: AssetUpdate):
         
         for key, value in update_data.items():
             asset[key] = value
+        
+        # Update lastMaintainedAt when owner edits the asset
+        asset["lastMaintainedAt"] = datetime.utcnow().isoformat()
         
         # Replace the item in Cosmos DB
         result = container.replace_item(item=asset_id, body=asset)

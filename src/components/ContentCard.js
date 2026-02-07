@@ -20,6 +20,7 @@ function ContentCard({ item, showProgress }) {
         <img 
           src={item.image} 
           alt={item.title} 
+          loading="lazy"
           onError={() => setImageError(true)}
         />
       ) : (

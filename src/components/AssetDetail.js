@@ -141,10 +141,13 @@ function AssetDetail() {
           <div className="asset-detail-info">
             <h1 className="asset-detail-title">{asset.assetName}</h1>
             <p className="asset-detail-author">
-              <span className="label">Created by:</span> {asset.createdBy}
+              <span className="label">Maintained by:</span> {asset.createdBy}
             </p>
             <p className="asset-detail-date">
               <span className="label">Created:</span> {new Date(asset.createdAt).toLocaleDateString()}
+            </p>
+            <p className="asset-detail-date">
+              <span className="label">Last maintained:</span> {new Date(asset.lastMaintainedAt || asset.createdAt).toLocaleDateString()}
             </p>
             
             {asset.tags && asset.tags.length > 0 && (
@@ -225,7 +228,7 @@ function AssetDetail() {
             <div className="screenshots-grid">
               {asset.screenshots.map((screenshot, index) => (
                 <div key={index} className="screenshot-item">
-                  <img src={screenshot} alt={`Screenshot ${index + 1}`} />
+                  <img src={screenshot} alt={`Screenshot ${index + 1}`} loading="lazy" />
                 </div>
               ))}
             </div>
