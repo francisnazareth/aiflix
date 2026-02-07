@@ -242,7 +242,15 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
     <div className="modal show" onClick={handleBackdropClick}>
       <div className="modal-content">
         <div className="modal-header">
-          <h2>{isEditMode ? 'Edit Asset' : 'Add New Asset'}</h2>
+          <div className="modal-header-text">
+            <h2>{isEditMode ? 'Fix asset details' : 'Add New Asset'}</h2>
+            {isEditMode && (
+              <>
+                <p className="modal-subtitle">Use this to update details or links</p>
+                <p className="modal-subtitle-light">Changes here won't affect how others use the demo.</p>
+              </>
+            )}
+          </div>
           <button className="modal-close" onClick={handleClose}>&times;</button>
         </div>
         {errorMessage && (

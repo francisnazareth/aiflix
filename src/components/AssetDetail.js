@@ -13,6 +13,7 @@ function AssetDetail() {
   const [user, setUser] = useState(null);
   const [showImproveModal, setShowImproveModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch authenticated user from EasyAuth
@@ -77,10 +78,6 @@ function AssetDetail() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
-      return;
-    }
-    
     setIsDeleting(true);
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -96,6 +93,7 @@ function AssetDetail() {
       navigate('/');
     } catch (err) {
       alert(`Failed to delete asset: ${err.message}`);
+      setShowDeleteModal(false);
     } finally {
       setIsDeleting(false);
     }
@@ -170,14 +168,16 @@ function AssetDetail() {
                   className="btn btn-secondary"
                   onClick={() => setShowEditModal(true)}
                 >
-                  Edit Asset
+                  Fix asset details
                 </button>
                 <button 
-                  className="btn btn-danger"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
+                  className="btn btn-delete-link"
+                  onClick={() => setShowDeleteModal(true)}
                 >
-                  {isDeleting ? 'Deleting...' : 'Delete Asset'}
+                  <svg className="trash-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>
+                  Delete asset
                 </button>
               </div>
             )}
@@ -255,6 +255,31 @@ function AssetDetail() {
         }}
         asset={asset}
       />
+
+      {showDeleteModal && (
+        <div className="modal show" onClick={(e) => e.target.classList.contains('modal') && setShowDeleteModal(false)}>
+          <div className="delete-modal-content">
+            <h2>Delete asset</h2>
+            <p>This removes the asset from the demo library. Others won't be able to access it.</p>
+            <div className="delete-modal-actions">
+              <button 
+                className="btn btn-danger"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
