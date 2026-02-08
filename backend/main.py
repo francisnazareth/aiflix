@@ -180,6 +180,7 @@ class AssetCreate(BaseModel):
     assetDescription: str
     primaryCustomerScenario: Optional[str] = None
     createdBy: str
+    createdByEmail: Optional[str] = None
     tags: List[str] = []
     architectureUrl: Optional[str] = None
     presentationUrl: Optional[str] = None
@@ -195,6 +196,7 @@ class Asset(BaseModel):
     assetDescription: str
     primaryCustomerScenario: Optional[str] = None
     createdBy: str
+    createdByEmail: Optional[str] = None
     tags: List[str] = []
     architectureUrl: Optional[str] = None
     presentationUrl: Optional[str] = None
@@ -523,6 +525,7 @@ async def create_asset(asset: AssetCreate):
         "assetDescription": asset.assetDescription,
         "primaryCustomerScenario": asset.primaryCustomerScenario,
         "createdBy": asset.createdBy,
+        "createdByEmail": asset.createdByEmail,
         "tags": asset.tags,
         "architectureUrl": asset.architectureUrl,
         "presentationUrl": asset.presentationUrl,

@@ -138,15 +138,19 @@ function AssetDetail() {
             <h1 className="asset-detail-title">{asset.assetName}</h1>
             <p className="asset-detail-author">
               <span className="label">Maintained by:</span>{' '}
-              <a 
-                href={`https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(asset.createdBy)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="owner-link"
-                title="Chat in Teams"
-              >
-                {asset.createdBy}
-              </a>
+              {asset.createdByEmail ? (
+                <a 
+                  href={`https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(asset.createdByEmail)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="owner-link"
+                  title="Chat in Teams"
+                >
+                  {asset.createdBy}
+                </a>
+              ) : (
+                <span>{asset.createdBy}</span>
+              )}
             </p>
             <p className="asset-detail-date">
               <span className="label">Created:</span> {new Date(asset.createdAt).toLocaleDateString()}

@@ -142,6 +142,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
       // Include extra fields only for create mode
       if (!isEditMode) {
         submitData.createdBy = user?.userName || 'Anonymous';
+        submitData.createdByEmail = user?.userId || null;
         submitData.tags = [];
         submitData.assetPicture = null;
         submitData.screenshots = [];
