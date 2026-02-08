@@ -1302,6 +1302,17 @@ body {
     margin-right: 0.5rem;
 }
 
+.owner-link {
+    color: #6264a7;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.owner-link:hover {
+    color: #8b8cc7;
+    text-decoration: underline;
+}
+
 .asset-detail-tags {
     margin-top: 1.5rem;
 }
