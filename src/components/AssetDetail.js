@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Comments from './Comments';
 import ImproveAssetModal from './ImproveAssetModal';
 import AddAssetModal from './AddAssetModal';
+import api from '../api';
 
 function AssetDetail() {
   const { id } = useParams();
@@ -51,8 +52,7 @@ function AssetDetail() {
   useEffect(() => {
     const fetchAsset = async () => {
       try {
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-        const response = await fetch(`${apiUrl}/api/assets/${id}`);
+        const response = await api.get(`/api/assets/${id}`);
         if (!response.ok) {
           throw new Error('Asset not found');
         }
@@ -69,8 +69,7 @@ function AssetDetail() {
   }, [id]);
 
   const refreshAsset = async () => {
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-    const response = await fetch(`${apiUrl}/api/assets/${id}`);
+    const response = await api.get(`/api/assets/${id}`);
     if (response.ok) {
       const data = await response.json();
       setAsset(data);
@@ -80,10 +79,7 @@ function AssetDetail() {
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/assets/${id}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/api/assets/${id}`);
       
       if (!response.ok) {
         const errorData = await response.json();

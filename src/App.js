@@ -6,6 +6,7 @@ import ContentRow from './components/ContentRow';
 import AddAssetModal from './components/AddAssetModal';
 import AssetDetail from './components/AssetDetail';
 import SignedOutPage from './components/SignedOutPage';
+import api from './api';
 
 // Authentication wrapper component
 function AuthRequired({ children }) {
@@ -63,8 +64,7 @@ function HomePage({ onAddAsset, searchQuery }) {
 
   const fetchAssets = async () => {
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/assets`);
+      const response = await api.get('/api/assets');
       if (response.ok) {
         const data = await response.json();
         setAssets(data);

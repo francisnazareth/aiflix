@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../api';
 
 function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
   const isEditMode = !!editAsset;
@@ -88,16 +89,9 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
     
     setIsGeneratingImage(true);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/generate-image`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          asset_name: targetAsset.assetName,
-          asset_description: targetAsset.assetDescription,
-        }),
+      const response = await api.post('/api/generate-image', {
+        asset_name: targetAsset.assetName,
+        asset_description: targetAsset.assetDescription,
       });
       
       if (!response.ok) {
@@ -110,13 +104,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
       setPicturePreview(imageDataUrl);
       
       // Update the asset with the generated image
-      await fetch(`${apiUrl}/api/assets/${targetAsset.id}/picture`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ assetPicture: imageDataUrl }),
-      });
+      await api.patch(`/api/assets/${targetAsset.id}/picture`, { assetPicture: imageDataUrl });
     } catch (error) {
       console.error('Error generating image:', error);
       alert(`Failed to generate image: ${error.message}`);
@@ -140,8 +128,6 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
     setIsSubmitting(true);
     
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      
       const submitData = {
         assetName: formData.assetName,
         assetDescription: formData.assetDescription,
@@ -161,17 +147,9 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
         submitData.screenshots = [];
       }
       
-      const url = isEditMode 
-        ? `${apiUrl}/api/assets/${editAsset.id}`
-        : `${apiUrl}/api/assets`;
-      
-      const response = await fetch(url, {
-        method: isEditMode ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submitData),
-      });
+      const response = isEditMode 
+        ? await api.put(`/api/assets/${editAsset.id}`, submitData)
+        : await api.post('/api/assets', submitData);
       
       if (!response.ok) {
         const errorData = await response.json();

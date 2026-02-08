@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -6,14 +6,66 @@ import base64
 import os
 import httpx
 import uuid
+import jwt
+from jwt import PyJWKClient
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from azure.identity import DefaultAzureCredential
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
-from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions
+from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions, UserDelegationKey
 
 load_dotenv()
 
 app = FastAPI(title="AiFlix API")
+
+# === JWT Token Validation ===
+FRONTEND_TENANT_ID = os.getenv("FRONTEND_TENANT_ID", "d83616d5-3d44-41f0-8dff-2133c103d72b")
+FRONTEND_CLIENT_ID = os.getenv("FRONTEND_CLIENT_ID", "9fa938f7-171c-406d-ab2b-b72279ead74e")
+JWKS_URL = f"https://login.microsoftonline.com/{FRONTEND_TENANT_ID}/discovery/v2.0/keys"
+
+# Cache the JWK client
+jwks_client = None
+
+def get_jwks_client():
+    global jwks_client
+    if jwks_client is None:
+        jwks_client = PyJWKClient(JWKS_URL)
+    return jwks_client
+
+async def validate_token(request: Request):
+    """Validate JWT token from frontend's Azure AD."""
+    # Skip auth for health check and local development
+    if request.url.path == "/health":
+        return None
+    
+    # Allow unauthenticated in development
+    auth_enabled = os.getenv("AUTH_ENABLED", "true").lower() == "true"
+    if not auth_enabled:
+        return None
+    
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    
+    token = auth_header.split(" ")[1]
+    
+    try:
+        # Get the signing key from Azure AD
+        signing_key = get_jwks_client().get_signing_key_from_jwt(token)
+        
+        # Decode and validate the token
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=FRONTEND_CLIENT_ID,
+            issuer=f"https://login.microsoftonline.com/{FRONTEND_TENANT_ID}/v2.0"
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 # CORS middleware for React frontend
 app.add_middleware(
@@ -23,6 +75,51 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Auth middleware for API routes
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth for non-API routes and health check
+        if not request.url.path.startswith("/api") or request.url.path == "/health":
+            return await call_next(request)
+        
+        # Skip auth in development
+        auth_enabled = os.getenv("AUTH_ENABLED", "true").lower() == "true"
+        if not auth_enabled:
+            return await call_next(request)
+        
+        # Handle CORS preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JSONResponse(status_code=401, content={"detail": "Missing or invalid Authorization header"})
+        
+        token = auth_header.split(" ")[1]
+        
+        try:
+            signing_key = get_jwks_client().get_signing_key_from_jwt(token)
+            jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=FRONTEND_CLIENT_ID,
+                issuer=f"https://login.microsoftonline.com/{FRONTEND_TENANT_ID}/v2.0"
+            )
+        except jwt.ExpiredSignatureError:
+            return JSONResponse(status_code=401, content={"detail": "Token has expired"})
+        except jwt.InvalidTokenError as e:
+            return JSONResponse(status_code=401, content={"detail": f"Invalid token: {str(e)}"})
+        except Exception as e:
+            return JSONResponse(status_code=401, content={"detail": f"Authentication failed: {str(e)}"})
+        
+        return await call_next(request)
+
+app.add_middleware(AuthMiddleware)
 
 # === Models ===
 
@@ -126,20 +223,31 @@ class Improvement(BaseModel):
 
 # === Azure Configuration ===
 
-# Azure AI Foundry configuration
+# Azure AI Foundry configuration (uses managed identity)
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-image-1")
 
-# Cosmos DB configuration
+# Cognitive Services scope for Azure OpenAI token
+COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default"
+
+# Cosmos DB configuration (uses managed identity)
 COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT")
-COSMOS_KEY = os.getenv("COSMOS_KEY")
 COSMOS_DATABASE = os.getenv("COSMOS_DATABASE", "aiflix")
 COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER", "assets")
 
-# Azure Blob Storage configuration
-BLOB_CONNECTION_STRING = os.getenv("BLOB_CONNECTION_STRING")
+# Azure Blob Storage configuration (uses managed identity)
+BLOB_ACCOUNT_URL = os.getenv("BLOB_ACCOUNT_URL")  # e.g., https://<account>.blob.core.windows.net
 BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME", "asset-images")
+
+# Shared credential for all Azure services
+azure_credential = None
+
+def get_azure_credential():
+    """Get or create the DefaultAzureCredential for managed identity."""
+    global azure_credential
+    if azure_credential is None:
+        azure_credential = DefaultAzureCredential()
+    return azure_credential
 
 # Initialize Cosmos DB client
 cosmos_client = None
@@ -153,31 +261,51 @@ improvements_container = None
 blob_service_client = None
 blob_container_client = None
 blob_account_name = None
-blob_account_key = None
+user_delegation_key = None
+user_delegation_key_expiry = None
 
 def init_blob_storage():
-    global blob_service_client, blob_container_client, blob_account_name, blob_account_key
-    if BLOB_CONNECTION_STRING:
+    global blob_service_client, blob_container_client, blob_account_name
+    if BLOB_ACCOUNT_URL:
         try:
-            blob_service_client = BlobServiceClient.from_connection_string(BLOB_CONNECTION_STRING)
+            credential = get_azure_credential()
+            blob_service_client = BlobServiceClient(BLOB_ACCOUNT_URL, credential=credential)
             blob_container_client = blob_service_client.get_container_client(BLOB_CONTAINER_NAME)
             
-            # Extract account name and key from connection string for SAS generation
-            conn_parts = dict(part.split("=", 1) for part in BLOB_CONNECTION_STRING.split(";") if "=" in part)
-            blob_account_name = conn_parts.get("AccountName")
-            blob_account_key = conn_parts.get("AccountKey")
+            # Extract account name from URL
+            # URL format: https://<account>.blob.core.windows.net
+            blob_account_name = BLOB_ACCOUNT_URL.replace("https://", "").split(".")[0]
             
             # Create container if it doesn't exist (without public access)
             if not blob_container_client.exists():
                 blob_container_client.create_container()
-            print(f"Connected to Blob Storage: {BLOB_CONTAINER_NAME}")
+            print(f"Connected to Blob Storage (managed identity): {BLOB_CONTAINER_NAME}")
         except Exception as e:
             print(f"Failed to connect to Blob Storage: {e}")
     else:
-        print("Blob Storage connection string not configured")
+        print("Blob Storage account URL not configured")
+
+def get_user_delegation_key():
+    """Get or refresh user delegation key for SAS token generation."""
+    global user_delegation_key, user_delegation_key_expiry
+    
+    now = datetime.utcnow()
+    # Refresh key if it doesn't exist or will expire in less than 1 hour
+    if user_delegation_key is None or user_delegation_key_expiry is None or user_delegation_key_expiry < now + timedelta(hours=1):
+        # Key valid for 7 days
+        key_start = now - timedelta(minutes=5)  # Account for clock skew
+        key_expiry = now + timedelta(days=7)
+        user_delegation_key = blob_service_client.get_user_delegation_key(
+            key_start_time=key_start,
+            key_expiry_time=key_expiry
+        )
+        user_delegation_key_expiry = key_expiry
+        print(f"Refreshed user delegation key, expires: {key_expiry}")
+    
+    return user_delegation_key
 
 def upload_image_to_blob(image_base64: str, filename: str) -> str:
-    """Upload base64 image to Blob Storage and return URL with SAS token."""
+    """Upload base64 image to Blob Storage and return URL with User Delegation SAS token."""
     if not blob_container_client:
         raise Exception("Blob Storage not configured")
     
@@ -196,12 +324,13 @@ def upload_image_to_blob(image_base64: str, filename: str) -> str:
         content_settings=ContentSettings(content_type="image/png")
     )
     
-    # Generate SAS token for read access (valid for 1 year)
+    # Generate User Delegation SAS token for read access (valid for 1 year)
+    delegation_key = get_user_delegation_key()
     sas_token = generate_blob_sas(
         account_name=blob_account_name,
         container_name=BLOB_CONTAINER_NAME,
         blob_name=filename,
-        account_key=blob_account_key,
+        user_delegation_key=delegation_key,
         permission=BlobSasPermissions(read=True),
         expiry=datetime.utcnow() + timedelta(days=365)
     )
@@ -211,12 +340,12 @@ def upload_image_to_blob(image_base64: str, filename: str) -> str:
 def init_cosmos():
     global cosmos_client, database, container, ratings_container, comments_container, improvements_container
     print(f"DEBUG - COSMOS_ENDPOINT: {COSMOS_ENDPOINT}")
-    print(f"DEBUG - COSMOS_KEY present: {bool(COSMOS_KEY)}")
     print(f"DEBUG - COSMOS_DATABASE: {COSMOS_DATABASE}")
     print(f"DEBUG - COSMOS_CONTAINER: {COSMOS_CONTAINER}")
-    if COSMOS_ENDPOINT and COSMOS_KEY:
+    if COSMOS_ENDPOINT:
         try:
-            cosmos_client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
+            credential = get_azure_credential()
+            cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=credential)
             database = cosmos_client.create_database_if_not_exists(id=COSMOS_DATABASE)
             # Note: No offer_throughput for serverless Cosmos DB accounts
             container = database.create_container_if_not_exists(
@@ -238,13 +367,13 @@ def init_cosmos():
                 id="improvements",
                 partition_key=PartitionKey(path="/assetId")
             )
-            print(f"Connected to Cosmos DB: {COSMOS_DATABASE}/{COSMOS_CONTAINER}")
+            print(f"Connected to Cosmos DB (managed identity): {COSMOS_DATABASE}/{COSMOS_CONTAINER}")
         except Exception as e:
             print(f"Failed to connect to Cosmos DB: {e}")
             import traceback
             traceback.print_exc()
     else:
-        print("Cosmos DB credentials not configured")
+        print("Cosmos DB endpoint not configured")
 
 # Initialize on startup
 init_cosmos()
@@ -252,7 +381,59 @@ init_blob_storage()
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "cosmos_connected": container is not None, "blob_connected": blob_container_client is not None}
+    """Health check that verifies managed identity access to all services."""
+    health_status = {
+        "status": "healthy",
+        "services": {
+            "cosmos_db": {"configured": False, "connected": False, "error": None},
+            "blob_storage": {"configured": False, "connected": False, "error": None},
+            "azure_openai": {"configured": False, "connected": False, "error": None}
+        }
+    }
+    
+    # Check Cosmos DB - verify we can read from the database
+    if COSMOS_ENDPOINT:
+        health_status["services"]["cosmos_db"]["configured"] = True
+        if container:
+            try:
+                # Try to read database properties to verify managed identity access
+                list(container.query_items(query="SELECT VALUE COUNT(1) FROM c", enable_cross_partition_query=True, max_item_count=1))
+                health_status["services"]["cosmos_db"]["connected"] = True
+            except Exception as e:
+                health_status["services"]["cosmos_db"]["error"] = str(e)
+                health_status["status"] = "degraded"
+    
+    # Check Blob Storage - verify we can access the container
+    if BLOB_ACCOUNT_URL:
+        health_status["services"]["blob_storage"]["configured"] = True
+        if blob_container_client:
+            try:
+                # Try to check container properties to verify managed identity access
+                blob_container_client.get_container_properties()
+                health_status["services"]["blob_storage"]["connected"] = True
+            except Exception as e:
+                health_status["services"]["blob_storage"]["error"] = str(e)
+                health_status["status"] = "degraded"
+    
+    # Check Azure OpenAI - verify we can get a token
+    if AZURE_OPENAI_ENDPOINT:
+        health_status["services"]["azure_openai"]["configured"] = True
+        try:
+            # Try to get a token to verify managed identity has Cognitive Services access
+            credential = get_azure_credential()
+            token = credential.get_token(COGNITIVE_SERVICES_SCOPE)
+            if token:
+                health_status["services"]["azure_openai"]["connected"] = True
+        except Exception as e:
+            health_status["services"]["azure_openai"]["error"] = str(e)
+            health_status["status"] = "degraded"
+    
+    # Set overall status to unhealthy if no services are connected
+    all_disconnected = not any(svc["connected"] for svc in health_status["services"].values())
+    if all_disconnected and any(svc["configured"] for svc in health_status["services"].values()):
+        health_status["status"] = "unhealthy"
+    
+    return health_status
 
 # === Asset CRUD Endpoints ===
 
@@ -708,13 +889,17 @@ Asset Title: {request.asset_name}
 Asset Description: {request.asset_description if request.asset_description else 'N/A'}
 Visual Metaphors: Create visual metaphors based on the description - such as documents, checklists, magnifying glass, AI neural nodes, dashboards, shields, gavels, or other relevant imagery."""
 
-    if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
+    if not AZURE_OPENAI_ENDPOINT:
         raise HTTPException(
             status_code=500, 
-            detail="Azure OpenAI credentials not configured. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY environment variables."
+            detail="Azure OpenAI endpoint not configured. Set AZURE_OPENAI_ENDPOINT environment variable."
         )
     
     try:
+        # Get access token using managed identity
+        credential = get_azure_credential()
+        token = credential.get_token(COGNITIVE_SERVICES_SCOPE)
+        
         # Azure AI Foundry OpenAI-compatible endpoint format
         url = f"{AZURE_OPENAI_ENDPOINT}/images/generations"
         
@@ -723,7 +908,7 @@ Visual Metaphors: Create visual metaphors based on the description - such as doc
         
         headers = {
             "Content-Type": "application/json",
-            "api-key": AZURE_OPENAI_API_KEY
+            "Authorization": f"Bearer {token.token}"
         }
         
         payload = {

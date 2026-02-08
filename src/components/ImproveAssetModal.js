@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../api';
 
 function ImproveAssetModal({ onClose, asset, user, onSuccess }) {
   const [activeAction, setActiveAction] = useState(null);
@@ -36,16 +37,11 @@ function ImproveAssetModal({ onClose, asset, user, onSuccess }) {
   const handleSubmit = async (actionType, data) => {
     setIsSubmitting(true);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/api/assets/${asset.id}/improvements`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: actionType,
-          data: data,
-          contributorName: user?.userName || 'Anonymous',
-          contributorId: user?.userId || 'anonymous'
-        })
+      const response = await api.post(`/api/assets/${asset.id}/improvements`, {
+        type: actionType,
+        data: data,
+        contributorName: user?.userName || 'Anonymous',
+        contributorId: user?.userId || 'anonymous'
       });
 
       if (!response.ok) {

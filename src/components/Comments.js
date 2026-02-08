@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Comments.css';
+import api from '../api';
 
 const Comments = ({ assetId, user }) => {
   const [comments, setComments] = useState([]);
@@ -7,16 +8,15 @@ const Comments = ({ assetId, user }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
   useEffect(() => {
     fetchComments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetId]);
 
   const fetchComments = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/assets/${assetId}/comments`);
+      const response = await api.get(`/api/assets/${assetId}/comments`);
       if (response.ok) {
         const data = await response.json();
         setComments(data);
@@ -42,14 +42,10 @@ const Comments = ({ assetId, user }) => {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_URL}/api/assets/${assetId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: newComment.trim(),
-          userId: user.userId,
-          userName: user.userName || user.userId
-        })
+      const response = await api.post(`/api/assets/${assetId}/comments`, {
+        text: newComment.trim(),
+        userId: user.userId,
+        userName: user.userName || user.userId
       });
 
       if (response.ok) {
@@ -73,9 +69,8 @@ const Comments = ({ assetId, user }) => {
     }
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/assets/${assetId}/comments/${commentId}?user_id=${encodeURIComponent(user.userId)}`,
-        { method: 'DELETE' }
+      const response = await api.delete(
+        `/api/assets/${assetId}/comments/${commentId}?user_id=${encodeURIComponent(user.userId)}`
       );
 
       if (response.ok) {
