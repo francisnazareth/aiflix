@@ -67,15 +67,6 @@ async def validate_token(request: Request):
     except jwt.InvalidTokenError as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
-# CORS middleware for React frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "https://aiflix-dev.azurewebsites.net"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Auth middleware for API routes
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -119,7 +110,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
         
         return await call_next(request)
 
+# Add AuthMiddleware first, then CORS wraps it (middleware order is reversed)
 app.add_middleware(AuthMiddleware)
+
+# CORS middleware for React frontend - added after auth so it wraps auth responses
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "https://aiflix-dev.azurewebsites.net"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # === Models ===
 
