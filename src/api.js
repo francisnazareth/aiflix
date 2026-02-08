@@ -92,6 +92,7 @@ export async function apiFetch(endpoint, options = {}) {
 /**
  * Convenience methods
  */
+
 export const api = {
   get: (endpoint) => apiFetch(endpoint),
   
