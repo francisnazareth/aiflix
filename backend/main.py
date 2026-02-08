@@ -19,7 +19,7 @@ load_dotenv()
 app = FastAPI(title="AiFlix API")
 
 # === JWT Token Validation ===
-FRONTEND_TENANT_ID = os.getenv("FRONTEND_TENANT_ID", "d83616d5-3d44-41f0-8dff-2133c103d72b")
+FRONTEND_TENANT_ID = os.getenv("FRONTEND_TENANT_ID", "72f988bf-86f1-41af-91ab-2d7cd011db47")
 FRONTEND_CLIENT_ID = os.getenv("FRONTEND_CLIENT_ID", "9fa938f7-171c-406d-ab2b-b72279ead74e")
 JWKS_URL = f"https://login.microsoftonline.com/{FRONTEND_TENANT_ID}/discovery/v2.0/keys"
 
