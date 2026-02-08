@@ -7,12 +7,23 @@ import os
 import httpx
 import uuid
 import jwt
+import logging
+import sys
 from jwt import PyJWKClient
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from azure.identity import DefaultAzureCredential
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from azure.storage.blob import BlobServiceClient, ContentSettings, generate_blob_sas, BlobSasPermissions, UserDelegationKey
+
+# Configure logging to stdout for Azure App Service
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("aiflix")
+logger.setLevel(logging.DEBUG)
 
 load_dotenv()
 
@@ -22,6 +33,14 @@ app = FastAPI(title="AiFlix API")
 FRONTEND_TENANT_ID = os.getenv("FRONTEND_TENANT_ID", "72f988bf-86f1-41af-91ab-2d7cd011db47")
 FRONTEND_CLIENT_ID = os.getenv("FRONTEND_CLIENT_ID", "9fa938f7-171c-406d-ab2b-b72279ead74e")
 JWKS_URL = f"https://login.microsoftonline.com/{FRONTEND_TENANT_ID}/discovery/v2.0/keys"
+AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() == "true"
+
+logger.info("=== JWT Auth Configuration ===")
+logger.info(f"AUTH_ENABLED: {AUTH_ENABLED}")
+logger.info(f"FRONTEND_TENANT_ID: {FRONTEND_TENANT_ID}")
+logger.info(f"FRONTEND_CLIENT_ID: {FRONTEND_CLIENT_ID}")
+logger.info(f"JWKS_URL: {JWKS_URL}")
+logger.info("==============================")
 
 # Cache the JWK client
 jwks_client = None
@@ -73,39 +92,63 @@ from starlette.responses import JSONResponse
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        logger.debug(f"AUTH - Request: {request.method} {request.url.path}")
+        
         # Skip auth for non-API routes and health check
         if not request.url.path.startswith("/api") or request.url.path == "/health":
+            logger.debug("AUTH - Skipping auth (non-API or health)")
             return await call_next(request)
         
         # Skip auth in development
         auth_enabled = os.getenv("AUTH_ENABLED", "true").lower() == "true"
         if not auth_enabled:
+            logger.debug("AUTH - Skipping auth (AUTH_ENABLED=false)")
             return await call_next(request)
         
         # Handle CORS preflight
         if request.method == "OPTIONS":
+            logger.debug("AUTH - Skipping auth (OPTIONS preflight)")
             return await call_next(request)
         
         auth_header = request.headers.get("Authorization")
+        logger.info(f"AUTH - Authorization header present: {bool(auth_header)}")
+        if auth_header:
+            logger.debug(f"AUTH - Authorization header prefix: {auth_header[:50]}...")
+        
         if not auth_header or not auth_header.startswith("Bearer "):
+            logger.warning("AUTH - REJECTED: Missing or invalid Authorization header")
             return JSONResponse(status_code=401, content={"detail": "Missing or invalid Authorization header"})
         
         token = auth_header.split(" ")[1]
+        logger.debug(f"AUTH - Token length: {len(token)}")
+        logger.debug(f"AUTH - Token prefix: {token[:50]}...")
         
         try:
+            logger.debug(f"AUTH - Fetching signing key from JWKS: {JWKS_URL}")
             signing_key = get_jwks_client().get_signing_key_from_jwt(token)
-            jwt.decode(
+            logger.debug("AUTH - Got signing key, validating token...")
+            logger.debug(f"AUTH - Expected audience: {FRONTEND_CLIENT_ID}")
+            logger.debug(f"AUTH - Expected issuer: https://login.microsoftonline.com/{FRONTEND_TENANT_ID}/v2.0")
+            
+            decoded = jwt.decode(
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
                 audience=FRONTEND_CLIENT_ID,
                 issuer=f"https://login.microsoftonline.com/{FRONTEND_TENANT_ID}/v2.0"
             )
+            logger.info("AUTH - Token validated successfully!")
+            logger.debug(f"AUTH - Token sub: {decoded.get('sub')}")
+            logger.debug(f"AUTH - Token aud: {decoded.get('aud')}")
+            logger.debug(f"AUTH - Token iss: {decoded.get('iss')}")
         except jwt.ExpiredSignatureError:
+            logger.warning("AUTH - REJECTED: Token expired")
             return JSONResponse(status_code=401, content={"detail": "Token has expired"})
         except jwt.InvalidTokenError as e:
+            logger.warning(f"AUTH - REJECTED: Invalid token - {str(e)}")
             return JSONResponse(status_code=401, content={"detail": f"Invalid token: {str(e)}"})
         except Exception as e:
+            logger.error(f"AUTH - REJECTED: Exception - {str(e)}", exc_info=True)
             return JSONResponse(status_code=401, content={"detail": f"Authentication failed: {str(e)}"})
         
         return await call_next(request)
@@ -280,11 +323,11 @@ def init_blob_storage():
             # Create container if it doesn't exist (without public access)
             if not blob_container_client.exists():
                 blob_container_client.create_container()
-            print(f"Connected to Blob Storage (managed identity): {BLOB_CONTAINER_NAME}")
+            logger.info(f"Connected to Blob Storage (managed identity): {BLOB_CONTAINER_NAME}")
         except Exception as e:
-            print(f"Failed to connect to Blob Storage: {e}")
+            logger.info(f"Failed to connect to Blob Storage: {e}")
     else:
-        print("Blob Storage account URL not configured")
+        logger.info("Blob Storage account URL not configured")
 
 def get_user_delegation_key():
     """Get or refresh user delegation key for SAS token generation."""
@@ -301,7 +344,7 @@ def get_user_delegation_key():
             key_expiry_time=key_expiry
         )
         user_delegation_key_expiry = key_expiry
-        print(f"Refreshed user delegation key, expires: {key_expiry}")
+        logger.info(f"Refreshed user delegation key, expires: {key_expiry}")
     
     return user_delegation_key
 
@@ -340,9 +383,9 @@ def upload_image_to_blob(image_base64: str, filename: str) -> str:
 
 def init_cosmos():
     global cosmos_client, database, container, ratings_container, comments_container, improvements_container
-    print(f"DEBUG - COSMOS_ENDPOINT: {COSMOS_ENDPOINT}")
-    print(f"DEBUG - COSMOS_DATABASE: {COSMOS_DATABASE}")
-    print(f"DEBUG - COSMOS_CONTAINER: {COSMOS_CONTAINER}")
+    logger.info(f"DEBUG - COSMOS_ENDPOINT: {COSMOS_ENDPOINT}")
+    logger.info(f"DEBUG - COSMOS_DATABASE: {COSMOS_DATABASE}")
+    logger.info(f"DEBUG - COSMOS_CONTAINER: {COSMOS_CONTAINER}")
     if COSMOS_ENDPOINT:
         try:
             credential = get_azure_credential()
@@ -368,13 +411,13 @@ def init_cosmos():
                 id="improvements",
                 partition_key=PartitionKey(path="/assetId")
             )
-            print(f"Connected to Cosmos DB (managed identity): {COSMOS_DATABASE}/{COSMOS_CONTAINER}")
+            logger.info(f"Connected to Cosmos DB (managed identity): {COSMOS_DATABASE}/{COSMOS_CONTAINER}")
         except Exception as e:
-            print(f"Failed to connect to Cosmos DB: {e}")
+            logger.info(f"Failed to connect to Cosmos DB: {e}")
             import traceback
             traceback.print_exc()
     else:
-        print("Cosmos DB endpoint not configured")
+        logger.info("Cosmos DB endpoint not configured")
 
 # Initialize on startup
 init_cosmos()
@@ -454,7 +497,7 @@ async def create_asset(asset: AssetCreate):
             filename = f"{asset_id}/main.png"
             asset_picture_url = upload_image_to_blob(asset.assetPicture, filename)
         except Exception as e:
-            print(f"Failed to upload asset picture: {e}")
+            logger.info(f"Failed to upload asset picture: {e}")
             # Fall back to storing base64 if blob upload fails
             asset_picture_url = asset.assetPicture
     elif asset.assetPicture:
@@ -469,7 +512,7 @@ async def create_asset(asset: AssetCreate):
                 url = upload_image_to_blob(screenshot, filename)
                 screenshot_urls.append(url)
             except Exception as e:
-                print(f"Failed to upload screenshot {i}: {e}")
+                logger.info(f"Failed to upload screenshot {i}: {e}")
                 screenshot_urls.append(screenshot)  # Fall back to base64
     else:
         screenshot_urls = asset.screenshots
@@ -565,7 +608,7 @@ async def update_asset_picture(asset_id: str, picture_update: AssetPictureUpdate
                 filename = f"{asset_id}_cover.png"
                 asset_picture_url = upload_image_to_blob(picture_update.assetPicture, filename)
             except Exception as e:
-                print(f"Failed to upload image to blob: {e}")
+                logger.info(f"Failed to upload image to blob: {e}")
                 # Fall back to base64
         
         # Update the asset
@@ -603,7 +646,7 @@ async def update_asset(asset_id: str, asset_update: AssetUpdate):
                     filename = f"{asset_id}_cover.png"
                     update_data['assetPicture'] = upload_image_to_blob(update_data['assetPicture'], filename)
                 except Exception as e:
-                    print(f"Failed to upload image to blob: {e}")
+                    logger.info(f"Failed to upload image to blob: {e}")
         
         for key, value in update_data.items():
             asset[key] = value
@@ -642,7 +685,7 @@ async def delete_asset(asset_id: str):
                 for rating in ratings:
                     ratings_container.delete_item(item=rating['id'], partition_key=rating['assetId'])
             except Exception as e:
-                print(f"Failed to delete ratings: {e}")
+                logger.info(f"Failed to delete ratings: {e}")
         
         # Delete associated comments
         if comments_container:
@@ -653,7 +696,7 @@ async def delete_asset(asset_id: str):
                 for comment in comments:
                     comments_container.delete_item(item=comment['id'], partition_key=comment['assetId'])
             except Exception as e:
-                print(f"Failed to delete comments: {e}")
+                logger.info(f"Failed to delete comments: {e}")
         
         # Delete asset image from blob storage if exists
         if blob_service_client and asset.get('assetPicture') and 'blob.core.windows.net' in asset.get('assetPicture', ''):
@@ -662,7 +705,7 @@ async def delete_asset(asset_id: str):
                 blob_name = f"{asset_id}_cover.png"
                 blob_container_client.delete_blob(blob_name)
             except Exception as e:
-                print(f"Failed to delete blob: {e}")
+                logger.info(f"Failed to delete blob: {e}")
         
         # Delete the asset
         container.delete_item(item=asset_id, partition_key=asset['createdBy'])
@@ -904,8 +947,8 @@ Visual Metaphors: Create visual metaphors based on the description - such as doc
         # Azure AI Foundry OpenAI-compatible endpoint format
         url = f"{AZURE_OPENAI_ENDPOINT}/images/generations"
         
-        print(f"DEBUG - Calling URL: {url}")
-        print(f"DEBUG - Model: {AZURE_OPENAI_DEPLOYMENT}")
+        logger.info(f"DEBUG - Calling URL: {url}")
+        logger.info(f"DEBUG - Model: {AZURE_OPENAI_DEPLOYMENT}")
         
         headers = {
             "Content-Type": "application/json",
@@ -921,7 +964,7 @@ Visual Metaphors: Create visual metaphors based on the description - such as doc
             "output_format": "png"    # Crisp UI assets
         }
         
-        print(f"DEBUG - Payload: {payload}")
+        logger.info(f"DEBUG - Payload: {payload}")
         
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(url, json=payload, headers=headers)
