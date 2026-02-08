@@ -8,11 +8,6 @@ const Comments = ({ assetId, user }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchComments();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetId]);
-
   const fetchComments = async () => {
     setIsLoading(true);
     try {
@@ -27,6 +22,10 @@ const Comments = ({ assetId, user }) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchComments();
+  }, [assetId]);
 
   const submitComment = async (e) => {
     e.preventDefault();
