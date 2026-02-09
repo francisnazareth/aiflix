@@ -1572,6 +1572,27 @@ body {
     font-style: italic;
 }
 
+/* Setup Notes */
+.setup-notes-container {
+    background: var(--secondary-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.setup-notes-text {
+    color: var(--text-light);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.setup-notes-contributor {
+    margin-top: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
 /* Responsive Asset Detail */
 @media (max-width: 900px) {
     .asset-detail-page {
@@ -1810,7 +1831,7 @@ body {
     background: rgba(255, 255, 255, 0.1);
 }
 
-.type-pill.selected {
+.type-pill.active {
     background: var(--primary-color);
     border-color: var(--primary-color);
 }

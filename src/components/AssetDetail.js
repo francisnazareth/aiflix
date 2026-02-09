@@ -255,8 +255,17 @@ function AssetDetail() {
                 GitHub Repository
               </a>
             )}
+            {/* Deployment scripts from improvements */}
+            {improvements.filter(imp => imp.type === 'deployment' && imp.data?.url).map((dep, idx) => (
+              <a key={`deploy-${idx}`} href={dep.data.url} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">🚀</span>
+                {dep.data.type ? `Deployment Script (${dep.data.type})` : 'Deployment Script'}
+                {dep.data.note && <span className="resource-note"> — {dep.data.note}</span>}
+                {dep.contributorName && <span className="contributor-badge">by {dep.contributorName}</span>}
+              </a>
+            ))}
             {!asset.architectureUrl && !asset.presentationUrl && !asset.githubUrl && 
-             improvements.filter(imp => ['architecture', 'slides'].includes(imp.type) && imp.data?.url).length === 0 && (
+             improvements.filter(imp => ['architecture', 'slides', 'deployment'].includes(imp.type) && imp.data?.url).length === 0 && (
               <p className="no-resources">No resource links available</p>
             )}
           </div>
@@ -313,6 +322,22 @@ function AssetDetail() {
                   </div>
                 ))}
               </div>
+            </div>
+          );
+        })()}
+
+        {/* Setup Notes section from improvements */}
+        {(() => {
+          const setupNotes = improvements.filter(imp => imp.type === 'setup' && imp.data?.notes);
+          return setupNotes.length > 0 && (
+            <div className="asset-detail-section">
+              <h2>Setup Notes</h2>
+              {setupNotes.map((note, idx) => (
+                <div key={idx} className="setup-notes-container">
+                  <p className="setup-notes-text">{note.data.notes}</p>
+                  {note.contributorName && <p className="setup-notes-contributor">Contributed by {note.contributorName}</p>}
+                </div>
+              ))}
             </div>
           );
         })()}
