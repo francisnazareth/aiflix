@@ -45,3 +45,8 @@ backend/venv/
 /script.js
 /styles.css
 node_modules
+
+#temp files
+update_email.py
+__azurite_db_queue__.json
+__azurite_db_queue_extent__.json
