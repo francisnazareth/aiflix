@@ -1491,6 +1491,80 @@ body {
     transform: scale(1.02);
 }
 
+.screenshot-info {
+    padding: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.screenshot-caption {
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+
+.screenshot-contributor {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
+/* Demo Flow Section */
+.demo-flow-container {
+    background-color: var(--bg-medium);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.demo-flow-steps {
+    margin: 0;
+    padding-left: 1.5rem;
+    counter-reset: step-counter;
+    list-style: none;
+}
+
+.demo-flow-step {
+    position: relative;
+    padding: 0.75rem 0 0.75rem 2rem;
+    color: var(--text-light);
+    font-size: 1rem;
+    line-height: 1.5;
+    border-left: 2px solid var(--border-color);
+    counter-increment: step-counter;
+}
+
+.demo-flow-step::before {
+    content: counter(step-counter);
+    position: absolute;
+    left: -1rem;
+    top: 0.75rem;
+    width: 2rem;
+    height: 2rem;
+    background-color: var(--netflix-red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: white;
+}
+
+.demo-flow-step:last-child {
+    border-left-color: transparent;
+}
+
+.demo-flow-contributor {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
 /* Responsive Asset Detail */
 @media (max-width: 900px) {
     .asset-detail-page {

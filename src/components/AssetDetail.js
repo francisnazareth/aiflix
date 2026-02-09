@@ -9,6 +9,7 @@ function AssetDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [asset, setAsset] = useState(null);
+  const [improvements, setImprovements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
@@ -58,6 +59,13 @@ function AssetDetail() {
         }
         const data = await response.json();
         setAsset(data);
+        
+        // Also fetch improvements
+        const improvementsResponse = await api.get(`/api/assets/${id}/improvements`);
+        if (improvementsResponse.ok) {
+          const improvementsData = await improvementsResponse.json();
+          setImprovements(improvementsData);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -73,6 +81,12 @@ function AssetDetail() {
     if (response.ok) {
       const data = await response.json();
       setAsset(data);
+    }
+    // Also refresh improvements
+    const improvementsResponse = await api.get(`/api/assets/${id}/improvements`);
+    if (improvementsResponse.ok) {
+      const improvementsData = await improvementsResponse.json();
+      setImprovements(improvementsData);
     }
   };
 
@@ -231,18 +245,60 @@ function AssetDetail() {
           </div>
         </div>
 
-        {asset.screenshots && asset.screenshots.length > 0 && (
-          <div className="asset-detail-section">
-            <h2>Screenshots</h2>
-            <div className="screenshots-grid">
-              {asset.screenshots.map((screenshot, index) => (
-                <div key={index} className="screenshot-item">
-                  <img src={screenshot} alt={`Screenshot ${index + 1}`} loading="lazy" />
+        {/* Demo Flow section from improvements */}
+        {(() => {
+          const demoFlows = improvements.filter(imp => imp.type === 'demoflow' && imp.data?.steps?.length > 0);
+          return demoFlows.length > 0 && (
+            <div className="asset-detail-section">
+              <h2>Demo Flow</h2>
+              {demoFlows.map((flow, flowIndex) => (
+                <div key={flowIndex} className="demo-flow-container">
+                  <ol className="demo-flow-steps">
+                    {flow.data.steps.map((step, stepIndex) => (
+                      <li key={stepIndex} className="demo-flow-step">{step}</li>
+                    ))}
+                  </ol>
+                  <p className="demo-flow-contributor">Contributed by {flow.contributorName}</p>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          );
+        })()}
+
+        {/* Screenshots section - combines asset screenshots and improvement screenshots */}
+        {(() => {
+          const assetScreenshots = asset.screenshots || [];
+          const improvementScreenshots = improvements
+            .filter(imp => imp.type === 'screenshots' && imp.data?.images)
+            .flatMap(imp => imp.data.images.map(img => ({
+              data: img.data,
+              caption: img.caption,
+              contributor: imp.contributorName
+            })));
+          const allScreenshots = [
+            ...assetScreenshots.map(s => ({ data: s, caption: null, contributor: null })),
+            ...improvementScreenshots
+          ];
+          
+          return allScreenshots.length > 0 && (
+            <div className="asset-detail-section">
+              <h2>Screenshots</h2>
+              <div className="screenshots-grid">
+                {allScreenshots.map((screenshot, index) => (
+                  <div key={index} className="screenshot-item">
+                    <img src={screenshot.data} alt={screenshot.caption || `Screenshot ${index + 1}`} loading="lazy" />
+                    {(screenshot.caption || screenshot.contributor) && (
+                      <div className="screenshot-info">
+                        {screenshot.caption && <span className="screenshot-caption">{screenshot.caption}</span>}
+                        {screenshot.contributor && <span className="screenshot-contributor">by {screenshot.contributor}</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="asset-detail-section">
           <Comments assetId={id} user={user} />
