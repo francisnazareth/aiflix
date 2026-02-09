@@ -1467,6 +1467,13 @@ body {
     font-style: italic;
 }
 
+.contributor-badge {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    font-style: italic;
+}
+
 .screenshots-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

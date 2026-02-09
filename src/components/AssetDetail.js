@@ -227,19 +227,36 @@ function AssetDetail() {
                 Architecture Diagram
               </a>
             )}
+            {/* Architecture links from improvements */}
+            {improvements.filter(imp => imp.type === 'architecture' && imp.data?.url).map((arch, idx) => (
+              <a key={`arch-${idx}`} href={arch.data.url} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">📐</span>
+                {arch.data.note || 'Architecture Diagram'}
+                {arch.contributorName && <span className="contributor-badge">by {arch.contributorName}</span>}
+              </a>
+            ))}
             {asset.presentationUrl && (
               <a href={asset.presentationUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
                 <span className="resource-icon">📊</span>
                 Slide Deck
               </a>
             )}
+            {/* Slides from improvements */}
+            {improvements.filter(imp => imp.type === 'slides' && imp.data?.url).map((slide, idx) => (
+              <a key={`slides-${idx}`} href={slide.data.url} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">📊</span>
+                {slide.data.note || 'Slide Deck'}
+                {slide.contributorName && <span className="contributor-badge">by {slide.contributorName}</span>}
+              </a>
+            ))}
             {asset.githubUrl && (
               <a href={asset.githubUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
                 <span className="resource-icon">💻</span>
                 GitHub Repository
               </a>
             )}
-            {!asset.architectureUrl && !asset.presentationUrl && !asset.githubUrl && (
+            {!asset.architectureUrl && !asset.presentationUrl && !asset.githubUrl && 
+             improvements.filter(imp => ['architecture', 'slides'].includes(imp.type) && imp.data?.url).length === 0 && (
               <p className="no-resources">No resource links available</p>
             )}
           </div>
