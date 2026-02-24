@@ -285,6 +285,22 @@ COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER", "assets")
 BLOB_ACCOUNT_URL = os.getenv("BLOB_ACCOUNT_URL")  # e.g., https://<account>.blob.core.windows.net
 BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME", "asset-images")
 
+# Azure Communication Services Email configuration (optional)
+# Set EMAIL_NOTIFICATIONS_ENABLED=true and provide the ACS env vars to enable
+EMAIL_NOTIFICATIONS_ENABLED = os.getenv("EMAIL_NOTIFICATIONS_ENABLED", "false").lower() == "true"
+ACS_ENDPOINT = os.getenv("ACS_ENDPOINT")  # e.g., https://<resource>.communication.azure.com
+ACS_SENDER_EMAIL = os.getenv("ACS_SENDER_EMAIL")  # e.g., DoNotReply@<domain>.azurecomm.net
+ACS_NOTIFY_RECIPIENTS = os.getenv("ACS_NOTIFY_RECIPIENTS", "")  # Comma-separated email addresses
+ACS_APP_URL = os.getenv("ACS_APP_URL", "https://aiflix-frontend-dev.azurewebsites.net")  # Frontend URL for email links
+
+logger.info(f"=== Email Notification Config ===")
+logger.info(f"EMAIL_NOTIFICATIONS_ENABLED: {EMAIL_NOTIFICATIONS_ENABLED}")
+if EMAIL_NOTIFICATIONS_ENABLED:
+    logger.info(f"ACS_ENDPOINT: {'set' if ACS_ENDPOINT else 'MISSING'}")
+    logger.info(f"ACS_SENDER_EMAIL: {'set' if ACS_SENDER_EMAIL else 'MISSING'}")
+    logger.info(f"ACS_NOTIFY_RECIPIENTS: {'set' if ACS_NOTIFY_RECIPIENTS else 'MISSING'}")
+logger.info(f"=================================")
+
 # Shared credential for all Azure services
 azure_credential = None
 
@@ -294,6 +310,69 @@ def get_azure_credential():
     if azure_credential is None:
         azure_credential = DefaultAzureCredential()
     return azure_credential
+
+
+def send_new_asset_notification(asset_name: str, asset_id: str, created_by: str, description: str = ""):
+    """Send email notification when a new asset is published. Silently skips if not configured."""
+    if not EMAIL_NOTIFICATIONS_ENABLED:
+        logger.debug("Email notifications disabled, skipping")
+        return
+
+    if not ACS_ENDPOINT or not ACS_SENDER_EMAIL or not ACS_NOTIFY_RECIPIENTS:
+        logger.info("Email notifications not configured, skipping")
+        return
+
+    try:
+        from azure.communication.email import EmailClient
+
+        recipients = [addr.strip() for addr in ACS_NOTIFY_RECIPIENTS.split(",") if addr.strip()]
+        if not recipients:
+            return
+
+        credential = get_azure_credential()
+        email_client = EmailClient(ACS_ENDPOINT, credential)
+
+        asset_url = f"{ACS_APP_URL}/asset/{asset_id}"
+        truncated_desc = (description[:200] + "...") if len(description) > 200 else description
+
+        html_body = f"""
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #e50914; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">AIFLIX</h1>
+            </div>
+            <div style="background: #1a1a1a; padding: 30px; color: #ffffff;">
+                <h2 style="color: #ffffff; margin-top: 0;">New Asset Published! 🚀</h2>
+                <p style="color: #cccccc;"><strong style="color: #ffffff;">{created_by}</strong> just published a new demo asset:</p>
+                <div style="background: #2a2a2a; border-left: 4px solid #e50914; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                    <h3 style="color: #ffffff; margin: 0 0 8px 0;">{asset_name}</h3>
+                    <p style="color: #aaaaaa; margin: 0; font-size: 14px;">{truncated_desc}</p>
+                </div>
+                <a href="{asset_url}" style="display: inline-block; background: #e50914; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">View Asset →</a>
+            </div>
+            <div style="background: #111111; padding: 15px; text-align: center;">
+                <p style="color: #666666; font-size: 12px; margin: 0;">You received this because you're subscribed to AIFLIX notifications.</p>
+            </div>
+        </div>
+        """
+
+        message = {
+            "senderAddress": ACS_SENDER_EMAIL,
+            "recipients": {
+                "to": [{"address": addr} for addr in recipients]
+            },
+            "content": {
+                "subject": f"New on AIFLIX: {asset_name}",
+                "html": html_body
+            }
+        }
+
+        poller = email_client.begin_send(message)
+        result = poller.result()
+        logger.info(f"Email notification sent successfully, message id: {result.get('id', 'N/A')}")
+
+    except Exception as e:
+        # Never let email failure block asset creation
+        logger.error(f"Failed to send email notification: {e}")
 
 # Initialize Cosmos DB client
 cosmos_client = None
@@ -540,6 +619,15 @@ async def create_asset(asset: AssetCreate):
     
     try:
         result = container.create_item(body=asset_doc)
+        
+        # Send email notification (async-safe, never blocks or fails the request)
+        send_new_asset_notification(
+            asset_name=asset.assetName,
+            asset_id=asset_id,
+            created_by=asset.createdBy or "Someone",
+            description=asset.assetDescription or ""
+        )
+        
         return Asset(**result)
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to create asset: {str(e)}")

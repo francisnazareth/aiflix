@@ -104,7 +104,7 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) 
     <header className="navbar" style={navbarStyle}>
       <div className="navbar-container">
         <div className="navbar-brand">
-          <span className="logo">AiFlix</span>
+          <span className="logo">AI Asset Hub</span>
         </div>
         <nav className="navbar-menu">
           {navLinks.map((link) => (

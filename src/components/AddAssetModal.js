@@ -321,6 +321,9 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
                   <svg className="pill-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> Recording
                 </button>
               </div>
+              <p style={{ fontSize: '12px', color: '#aaa', margin: '8px 0 0 0', fontStyle: 'italic' }}>
+                Tip – always keep your GitHub repos private, and provide access only when requested on a peer-to-peer basis.
+              </p>
               {demoLinkType && (
                 <input
                   type="url"
