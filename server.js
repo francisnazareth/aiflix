@@ -4,6 +4,13 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Runtime config endpoint - serves environment variables to the frontend
+app.get('/api/config', (req, res) => {
+  res.json({
+    apiUrl: process.env.REACT_APP_API_URL || 'http://localhost:8000'
+  });
+});
+
 // Serve static files from the build directory
 app.use(express.static(path.join(__dirname, 'build')));
 

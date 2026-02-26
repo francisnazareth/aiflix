@@ -4,7 +4,29 @@
  * Handles token expiry by refreshing via EasyAuth or prompting re-login.
  */
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Runtime API URL - loaded from /api/config at app startup
+let API_URL = 'http://localhost:8000'; // default fallback
+
+/**
+ * Initialize the API configuration by fetching /api/config.
+ * Must be called before the app renders.
+ */
+export async function initApiConfig() {
+  try {
+    const response = await fetch('/api/config');
+    if (response.ok) {
+      const config = await response.json();
+      if (config.apiUrl) {
+        API_URL = config.apiUrl;
+      }
+      console.log('API config loaded, API_URL:', API_URL);
+    } else {
+      console.warn('Failed to load /api/config, using default API_URL:', API_URL);
+    }
+  } catch (err) {
+    console.warn('Error fetching /api/config, using default API_URL:', API_URL, err);
+  }
+}
 
 // Cache for the auth token
 let cachedToken = null;

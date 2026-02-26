@@ -3,14 +3,16 @@ import './Navbar.css';
 
 const navLinks = ['Home']; // Hidden for now: 'New & Popular', 'My List'
 
-function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) {
+function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange, categories, selectedCategory, onCategoryChange }) {
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showSearchBar, setShowSearchBar] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
+  const categoryDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,6 +58,9 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) 
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowProfileDropdown(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setShowCategoryDropdown(false);
       }
     };
 
@@ -111,7 +116,7 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) 
             <a
               key={link}
               href="#"
-              className={`nav-link ${activeNavLink === link ? 'active' : ''}`}
+              className={`nav-link ${activeNavLink === link && !selectedCategory ? 'active' : ''}`}
               onClick={(e) => {
                 e.preventDefault();
                 onNavLinkClick(link);
@@ -120,6 +125,45 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange }) 
               {link}
             </a>
           ))}
+          {categories && categories.length > 0 && (
+            <div className="category-dropdown-container" ref={categoryDropdownRef}>
+              <a
+                href="#"
+                className={`nav-link ${selectedCategory ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowCategoryDropdown(!showCategoryDropdown);
+                }}
+              >
+                {selectedCategory || 'Categories'} ▾
+              </a>
+              {showCategoryDropdown && (
+                <div className="category-dropdown">
+                  <button
+                    className={`category-item ${!selectedCategory ? 'active' : ''}`}
+                    onClick={() => {
+                      onCategoryChange('');
+                      setShowCategoryDropdown(false);
+                    }}
+                  >
+                    All Categories
+                  </button>
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      className={`category-item ${selectedCategory === cat ? 'active' : ''}`}
+                      onClick={() => {
+                        onCategoryChange(cat);
+                        setShowCategoryDropdown(false);
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
         <div className="navbar-icons">
           <div ref={searchContainerRef} className={`search-container ${showSearchBar ? 'expanded' : ''}`}>

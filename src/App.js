@@ -58,7 +58,7 @@ function AuthRequired({ children }) {
   return children;
 }
 
-function HomePage({ onAddAsset, searchQuery }) {
+function HomePage({ onAddAsset, searchQuery, selectedCategory, onCategoriesLoaded }) {
   const [assets, setAssets] = useState([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
 
@@ -78,38 +78,81 @@ function HomePage({ onAddAsset, searchQuery }) {
 
   useEffect(() => {
     fetchAssets();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter assets based on search query
-  const filteredAssets = searchQuery
-    ? assets.filter(asset => 
-        asset.assetName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (asset.assetDescription && asset.assetDescription.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : assets;
+  // Notify parent of available categories whenever assets change
+  useEffect(() => {
+    if (assets.length > 0 && onCategoriesLoaded) {
+      const categories = [...new Set(assets.map(a => a.primaryCustomerScenario).filter(Boolean))].sort();
+      onCategoriesLoaded(categories);
+    }
+  }, [assets, onCategoriesLoaded]);
 
-  // Transform assets to content row format
-  const assetItems = filteredAssets.map(asset => ({
+  // Filter assets based on search query and selected category
+  let filteredAssets = assets;
+  if (searchQuery) {
+    filteredAssets = filteredAssets.filter(asset =>
+      asset.assetName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (asset.assetDescription && asset.assetDescription.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }
+  if (selectedCategory) {
+    filteredAssets = filteredAssets.filter(asset => asset.primaryCustomerScenario === selectedCategory);
+  }
+
+  // Helper to transform an asset to card format
+  const toCardItem = (asset) => ({
     id: asset.id,
     title: asset.assetName,
     year: asset.createdBy,
     image: asset.assetPicture || 'https://via.placeholder.com/250x350/1a1a1a/ff0000?text=No+Image'
-  }));
+  });
 
-  const rowTitle = searchQuery 
-    ? `Search results for "${searchQuery}"` 
-    : "DEMO Assets built by SEs & CSAs";
+  // Group assets by primaryCustomerScenario
+  const groupedByCategory = filteredAssets.reduce((groups, asset) => {
+    const category = asset.primaryCustomerScenario || 'Uncategorized';
+    if (!groups[category]) groups[category] = [];
+    groups[category].push(asset);
+    return groups;
+  }, {});
+
+  // Sort category names alphabetically, but put "Uncategorized" last
+  const categoryNames = Object.keys(groupedByCategory).sort((a, b) => {
+    if (a === 'Uncategorized') return 1;
+    if (b === 'Uncategorized') return -1;
+    return a.localeCompare(b);
+  });
 
   return (
     <>
       <HeroBanner onAddAsset={onAddAsset} />
       <main className="content-area">
-        <ContentRow 
-          title={rowTitle}
-          items={assetItems}
-          showProgress={false}
-          loading={loadingAssets}
-        />
+        {searchQuery || selectedCategory ? (
+          <ContentRow
+            title={searchQuery ? `Search results for "${searchQuery}"` : selectedCategory}
+            items={filteredAssets.map(toCardItem)}
+            showProgress={false}
+            loading={loadingAssets}
+          />
+        ) : (
+          categoryNames.map(category => (
+            <ContentRow
+              key={category}
+              title={category}
+              items={groupedByCategory[category].map(toCardItem)}
+              showProgress={false}
+              loading={loadingAssets}
+            />
+          ))
+        )}
+        {!loadingAssets && !searchQuery && !selectedCategory && categoryNames.length === 0 && (
+          <ContentRow
+            title="DEMO Assets built by SEs & CSAs"
+            items={[]}
+            showProgress={false}
+            loading={false}
+          />
+        )}
       </main>
     </>
   );
@@ -119,6 +162,8 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeNavLink, setActiveNavLink] = useState('Home');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState([]);
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -145,13 +190,29 @@ function App() {
             <div className="app">
               <Navbar 
                 activeNavLink={activeNavLink} 
-                onNavLinkClick={setActiveNavLink}
+                onNavLinkClick={(link) => {
+                  setActiveNavLink(link);
+                  if (link === 'Home') setSelectedCategory('');
+                }}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={(cat) => {
+                  setSelectedCategory(cat);
+                  setSearchQuery('');
+                }}
               />
               
               <Routes>
-                <Route path="/" element={<HomePage onAddAsset={handleOpenModal} searchQuery={searchQuery} />} />
+                <Route path="/" element={
+                  <HomePage 
+                    onAddAsset={handleOpenModal} 
+                    searchQuery={searchQuery} 
+                    selectedCategory={selectedCategory}
+                    onCategoriesLoaded={setCategories}
+                  />
+                } />
                 <Route path="/asset/:id" element={<AssetDetail />} />
               </Routes>
 
