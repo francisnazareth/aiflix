@@ -341,7 +341,7 @@ body {
 .content-card {
     flex: 0 0 calc((100% - 4rem) / 5);
     max-width: calc((100% - 4rem) / 5);
-    height: 350px;
+    height: 280px;
     position: relative;
     border-radius: 4px;
     overflow: hidden;
@@ -474,7 +474,7 @@ body {
     .content-card {
         flex: 0 0 calc((100% - 3rem) / 4);
         max-width: calc((100% - 3rem) / 4);
-        height: 280px;
+        height: 224px;
     }
 
     .footer-content {
@@ -531,7 +531,7 @@ body {
     .content-card {
         flex: 0 0 calc((100% - 2rem) / 3);
         max-width: calc((100% - 2rem) / 3);
-        height: 220px;
+        height: 176px;
     }
 
     .footer {
@@ -548,7 +548,7 @@ body {
     .content-card {
         flex: 0 0 calc((100% - 1rem) / 2);
         max-width: calc((100% - 1rem) / 2);
-        height: 200px;
+        height: 160px;
     }
 }
 

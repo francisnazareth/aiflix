@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Navbar.css';
 
 const navLinks = ['Home']; // Hidden for now: 'New & Popular', 'My List'
 
 function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange, categories, selectedCategory, onCategoryChange }) {
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -109,7 +111,7 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange, ca
     <header className="navbar" style={navbarStyle}>
       <div className="navbar-container">
         <div className="navbar-brand">
-          <span className="logo">AI Asset Hub</span>
+          <span className="logo" onClick={() => { onNavLinkClick('Home'); onCategoryChange(''); navigate('/'); }} style={{ cursor: 'pointer' }}>AI Asset Hub</span>
         </div>
         <nav className="navbar-menu">
           {navLinks.map((link) => (
@@ -120,6 +122,8 @@ function Navbar({ activeNavLink, onNavLinkClick, searchQuery, onSearchChange, ca
               onClick={(e) => {
                 e.preventDefault();
                 onNavLinkClick(link);
+                onCategoryChange('');
+                navigate('/');
               }}
             >
               {link}
