@@ -78,7 +78,7 @@ function HomePage({ onAddAsset, searchQuery, selectedCategory, onCategoriesLoade
 
   useEffect(() => {
     fetchAssets();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line
 
   // Notify parent of available categories whenever assets change
   useEffect(() => {
