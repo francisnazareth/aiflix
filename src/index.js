@@ -14,4 +14,3 @@ initApiConfig().then(() => {
     </React.StrictMode>
   );
 });
-);
