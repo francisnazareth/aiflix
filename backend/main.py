@@ -430,7 +430,10 @@ def get_user_delegation_key():
     return user_delegation_key
 
 def upload_image_to_blob(image_base64: str, filename: str) -> str:
-    """Upload base64 image to Blob Storage and return URL with User Delegation SAS token."""
+    """Upload base64 image to Blob Storage and return the blob name (path).
+    
+    SAS tokens are generated on-read, not on-upload, so they never expire prematurely.
+    """
     if not blob_container_client:
         raise Exception("Blob Storage not configured")
     
@@ -449,18 +452,70 @@ def upload_image_to_blob(image_base64: str, filename: str) -> str:
         content_settings=ContentSettings(content_type="image/png")
     )
     
-    # Generate User Delegation SAS token for read access (valid for 1 year)
+    # Return only the blob name — SAS is generated at read time
+    return filename
+
+
+def generate_blob_sas_url(blob_name: str) -> str:
+    """Generate a short-lived SAS URL for a blob. Called on every read."""
     delegation_key = get_user_delegation_key()
     sas_token = generate_blob_sas(
         account_name=blob_account_name,
         container_name=BLOB_CONTAINER_NAME,
-        blob_name=filename,
+        blob_name=blob_name,
         user_delegation_key=delegation_key,
         permission=BlobSasPermissions(read=True),
-        expiry=datetime.utcnow() + timedelta(days=365)
+        expiry=datetime.utcnow() + timedelta(hours=1)
     )
+    return f"{BLOB_ACCOUNT_URL}/{BLOB_CONTAINER_NAME}/{blob_name}?{sas_token}"
+
+
+def _extract_blob_name_from_url(url: str) -> Optional[str]:
+    """Extract blob name from a full Azure Blob Storage URL (with or without SAS)."""
+    if not blob_account_name:
+        return None
+    prefix = f"https://{blob_account_name}.blob.core.windows.net/{BLOB_CONTAINER_NAME}/"
+    if url.startswith(prefix):
+        # Strip the container prefix and any query params (old SAS token)
+        path = url[len(prefix):]
+        return path.split("?")[0]
+    return None
+
+
+def resign_image_url(value: Optional[str]) -> Optional[str]:
+    """Re-sign a single image value with a fresh SAS token.
     
-    return f"{blob_client.url}?{sas_token}"
+    Handles three storage formats:
+      1. Blob name only (new format, e.g. '{uuid}/main.png')
+      2. Full blob URL with old/expired SAS (legacy)
+      3. Base64 data URI or external URL — returned as-is
+    """
+    if not value or not blob_container_client:
+        return value
+    
+    # External URL or base64 data URI — leave untouched
+    if value.startswith("data:") or value.startswith("https://via.placeholder.com"):
+        return value
+    
+    # Legacy full blob URL — extract the blob name first
+    if value.startswith("https://"):
+        blob_name = _extract_blob_name_from_url(value)
+        if blob_name:
+            return generate_blob_sas_url(blob_name)
+        # Unknown external URL — leave as-is
+        return value
+    
+    # New format: bare blob name
+    return generate_blob_sas_url(value)
+
+
+def resign_asset_images(asset: dict) -> dict:
+    """Re-sign all image fields on an asset dict with fresh SAS tokens."""
+    if asset.get("assetPicture"):
+        asset["assetPicture"] = resign_image_url(asset["assetPicture"])
+    if asset.get("screenshots"):
+        asset["screenshots"] = [resign_image_url(s) for s in asset["screenshots"]]
+    return asset
 
 def init_cosmos():
     global cosmos_client, database, container, ratings_container, comments_container, improvements_container
@@ -628,20 +683,20 @@ async def create_asset(asset: AssetCreate):
             description=asset.assetDescription or ""
         )
         
-        return Asset(**result)
+        return Asset(**resign_asset_images(result))
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to create asset: {str(e)}")
 
 @app.get("/api/assets", response_model=List[Asset])
 async def get_assets():
-    """Get all assets from Cosmos DB."""
+    """Get all assets from Cosmos DB (images re-signed with fresh SAS tokens)."""
     if not container:
         raise HTTPException(status_code=500, detail="Cosmos DB not configured")
     
     try:
         query = "SELECT * FROM c ORDER BY c.createdAt DESC"
         items = list(container.query_items(query=query, enable_cross_partition_query=True))
-        return [Asset(**item) for item in items]
+        return [Asset(**resign_asset_images(item)) for item in items]
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch assets: {str(e)}")
 
@@ -672,7 +727,7 @@ async def get_asset(asset_id: str):
             asset["averageRating"] = avg_ratings[0] if avg_ratings and avg_ratings[0] else None
             asset["ratingCount"] = count_result[0] if count_result else 0
         
-        return Asset(**asset)
+        return Asset(**resign_asset_images(asset))
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch asset: {str(e)}")
 
@@ -707,7 +762,7 @@ async def update_asset_picture(asset_id: str, picture_update: AssetPictureUpdate
         
         # Replace the item in Cosmos DB
         result = container.replace_item(item=asset_id, body=asset)
-        return Asset(**result)
+        return Asset(**resign_asset_images(result))
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to update asset picture: {str(e)}")
 
@@ -747,7 +802,7 @@ async def update_asset(asset_id: str, asset_update: AssetUpdate):
         
         # Replace the item in Cosmos DB
         result = container.replace_item(item=asset_id, body=asset)
-        return Asset(**result)
+        return Asset(**resign_asset_images(result))
     except exceptions.CosmosHttpResponseError as e:
         raise HTTPException(status_code=500, detail=f"Failed to update asset: {str(e)}")
 
