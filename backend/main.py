@@ -284,6 +284,7 @@ COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER", "assets")
 # Azure Blob Storage configuration (uses managed identity)
 BLOB_ACCOUNT_URL = os.getenv("BLOB_ACCOUNT_URL")  # e.g., https://<account>.blob.core.windows.net
 BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME", "asset-images")
+CDN_ENDPOINT_URL = os.getenv("CDN_ENDPOINT_URL")  # e.g., https://<endpoint>.azurefd.net
 
 # Azure Communication Services Email configuration (optional)
 # Set EMAIL_NOTIFICATIONS_ENABLED=true and provide the ACS env vars to enable
@@ -456,8 +457,13 @@ def upload_image_to_blob(image_base64: str, filename: str) -> str:
     return filename
 
 
-def generate_blob_sas_url(blob_name: str) -> str:
-    """Generate a short-lived SAS URL for a blob. Called on every read."""
+def generate_blob_read_url(blob_name: str) -> str:
+    """Generate a readable URL for a blob with a SAS token.
+    
+    If CDN is configured, returns a CDN URL with SAS token attached.
+    Front Door forwards the SAS query string to storage via private link.
+    Otherwise, falls back to a direct blob URL with SAS.
+    """
     delegation_key = get_user_delegation_key()
     sas_token = generate_blob_sas(
         account_name=blob_account_name,
@@ -467,18 +473,25 @@ def generate_blob_sas_url(blob_name: str) -> str:
         permission=BlobSasPermissions(read=True),
         expiry=datetime.utcnow() + timedelta(hours=1)
     )
-    return f"{BLOB_ACCOUNT_URL}/{BLOB_CONTAINER_NAME}/{blob_name}?{sas_token}"
+    base_url = CDN_ENDPOINT_URL if CDN_ENDPOINT_URL else BLOB_ACCOUNT_URL
+    return f"{base_url}/{BLOB_CONTAINER_NAME}/{blob_name}?{sas_token}"
 
 
 def _extract_blob_name_from_url(url: str) -> Optional[str]:
-    """Extract blob name from a full Azure Blob Storage URL (with or without SAS)."""
+    """Extract blob name from a full Azure Blob Storage URL or CDN URL (with or without SAS)."""
     if not blob_account_name:
         return None
+    # Match direct blob storage URL
     prefix = f"https://{blob_account_name}.blob.core.windows.net/{BLOB_CONTAINER_NAME}/"
     if url.startswith(prefix):
-        # Strip the container prefix and any query params (old SAS token)
         path = url[len(prefix):]
         return path.split("?")[0]
+    # Match CDN URL
+    if CDN_ENDPOINT_URL:
+        cdn_prefix = f"{CDN_ENDPOINT_URL}/{BLOB_CONTAINER_NAME}/"
+        if url.startswith(cdn_prefix):
+            path = url[len(cdn_prefix):]
+            return path.split("?")[0]
     return None
 
 
@@ -501,12 +514,12 @@ def resign_image_url(value: Optional[str]) -> Optional[str]:
     if value.startswith("https://"):
         blob_name = _extract_blob_name_from_url(value)
         if blob_name:
-            return generate_blob_sas_url(blob_name)
+            return generate_blob_read_url(blob_name)
         # Unknown external URL — leave as-is
         return value
     
     # New format: bare blob name
-    return generate_blob_sas_url(value)
+    return generate_blob_read_url(value)
 
 
 def resign_asset_images(asset: dict) -> dict:
