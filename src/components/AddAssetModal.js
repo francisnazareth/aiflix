@@ -10,7 +10,6 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
     if (editAsset) {
       if (editAsset.githubUrl) return { type: 'github', url: editAsset.githubUrl };
       if (editAsset.presentationUrl) return { type: 'presentation', url: editAsset.presentationUrl };
-      if (editAsset.liveDemoUrl) return { type: 'livedemo', url: editAsset.liveDemoUrl };
       if (editAsset.recordingUrl) return { type: 'recording', url: editAsset.recordingUrl };
       if (editAsset.architectureUrl) return { type: 'architecture', url: editAsset.architectureUrl };
     }
@@ -25,6 +24,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
   const initialDemoLink = getInitialDemoLink();
   const [demoLinkType, setDemoLinkType] = useState(initialDemoLink.type);
   const [demoLinkUrl, setDemoLinkUrl] = useState(initialDemoLink.url);
+  const [liveDemoUrl, setLiveDemoUrl] = useState(editAsset?.liveDemoUrl || '');
   const [picturePreview, setPicturePreview] = useState(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -42,6 +42,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
       });
       setDemoLinkType(demoLink.type);
       setDemoLinkUrl(demoLink.url);
+      setLiveDemoUrl(editAsset?.liveDemoUrl || '');
       setPicturePreview(null);
       setShowSuccessDialog(false);
       setSavedAsset(null);
@@ -135,7 +136,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
         architectureUrl: demoLinkType === 'architecture' ? demoLinkUrl : null,
         presentationUrl: demoLinkType === 'presentation' ? demoLinkUrl : null,
         githubUrl: demoLinkType === 'github' ? demoLinkUrl : null,
-        liveDemoUrl: demoLinkType === 'livedemo' ? demoLinkUrl : null,
+        liveDemoUrl: liveDemoUrl.trim() || null,
         recordingUrl: demoLinkType === 'recording' ? demoLinkUrl : null,
       };
       
@@ -185,6 +186,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
     });
     setDemoLinkType(null);
     setDemoLinkUrl('');
+    setLiveDemoUrl('');
     setPicturePreview(null);
     setErrorMessage('');
   };
@@ -315,13 +317,6 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
                 </button>
                 <button
                   type="button"
-                  className={`demo-link-pill ${demoLinkType === 'livedemo' ? 'active' : ''}`}
-                  onClick={() => handleDemoLinkSelect('livedemo')}
-                >
-                  <svg className="pill-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M8 5v14l11-7z"/></svg> Live Demo URL
-                </button>
-                <button
-                  type="button"
                   className={`demo-link-pill ${demoLinkType === 'recording' ? 'active' : ''}`}
                   onClick={() => handleDemoLinkSelect('recording')}
                 >
@@ -335,11 +330,24 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
                 <input
                   type="url"
                   className="demo-link-input"
-                  placeholder={`Enter ${demoLinkType === 'github' ? 'GitHub repository' : demoLinkType === 'presentation' ? 'slide deck' : demoLinkType === 'architecture' ? 'architecture diagram' : demoLinkType === 'livedemo' ? 'live demo' : 'recording'} URL`}
+                  placeholder={`Enter ${demoLinkType === 'github' ? 'GitHub repository' : demoLinkType === 'presentation' ? 'slide deck' : demoLinkType === 'architecture' ? 'architecture diagram' : 'recording'} URL`}
                   value={demoLinkUrl}
                   onChange={(e) => { setDemoLinkUrl(e.target.value); setErrorMessage(''); }}
                 />
               )}
+              <div className="form-row" style={{ marginTop: '16px' }}>
+                <div className="form-group">
+                  <label htmlFor="liveDemoUrl">Live Demo URL (optional)</label>
+                  <input
+                    id="liveDemoUrl"
+                    type="url"
+                    className="demo-link-input"
+                    placeholder="Enter live demo URL"
+                    value={liveDemoUrl}
+                    onChange={(e) => setLiveDemoUrl(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
