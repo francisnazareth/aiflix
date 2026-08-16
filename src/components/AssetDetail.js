@@ -241,6 +241,18 @@ function AssetDetail() {
                 Slide Deck
               </a>
             )}
+            {asset.liveDemoUrl && (
+              <a href={asset.liveDemoUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">▶️</span>
+                Live Demo URL
+              </a>
+            )}
+            {asset.recordingUrl && (
+              <a href={asset.recordingUrl} target="_blank" rel="noopener noreferrer" className="resource-link">
+                <span className="resource-icon">🎥</span>
+                Recording
+              </a>
+            )}
             {/* Slides from improvements */}
             {improvements.filter(imp => imp.type === 'slides' && imp.data?.url).map((slide, idx) => (
               <a key={`slides-${idx}`} href={slide.data.url} target="_blank" rel="noopener noreferrer" className="resource-link">
@@ -264,7 +276,7 @@ function AssetDetail() {
                 {dep.contributorName && <span className="contributor-badge">by {dep.contributorName}</span>}
               </a>
             ))}
-            {!asset.architectureUrl && !asset.presentationUrl && !asset.githubUrl && 
+            {!asset.architectureUrl && !asset.presentationUrl && !asset.githubUrl && !asset.liveDemoUrl && !asset.recordingUrl && 
              improvements.filter(imp => ['architecture', 'slides', 'deployment'].includes(imp.type) && imp.data?.url).length === 0 && (
               <p className="no-resources">No resource links available</p>
             )}

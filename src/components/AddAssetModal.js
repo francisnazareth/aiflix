@@ -308,6 +308,13 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
                 </button>
                 <button
                   type="button"
+                  className={`demo-link-pill ${demoLinkType === 'architecture' ? 'active' : ''}`}
+                  onClick={() => handleDemoLinkSelect('architecture')}
+                >
+                  <svg className="pill-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm12 8H5v8h14v-8zM7 10h2v2H7v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2z"/></svg> Architecture
+                </button>
+                <button
+                  type="button"
                   className={`demo-link-pill ${demoLinkType === 'livedemo' ? 'active' : ''}`}
                   onClick={() => handleDemoLinkSelect('livedemo')}
                 >
@@ -328,7 +335,7 @@ function AddAssetModal({ isOpen, onClose, onSubmit, asset: editAsset }) {
                 <input
                   type="url"
                   className="demo-link-input"
-                  placeholder={`Enter ${demoLinkType === 'github' ? 'GitHub repository' : demoLinkType === 'presentation' ? 'slide deck' : demoLinkType === 'livedemo' ? 'live demo' : 'recording'} URL`}
+                  placeholder={`Enter ${demoLinkType === 'github' ? 'GitHub repository' : demoLinkType === 'presentation' ? 'slide deck' : demoLinkType === 'architecture' ? 'architecture diagram' : demoLinkType === 'livedemo' ? 'live demo' : 'recording'} URL`}
                   value={demoLinkUrl}
                   onChange={(e) => { setDemoLinkUrl(e.target.value); setErrorMessage(''); }}
                 />
